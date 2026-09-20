@@ -1,0 +1,170 @@
+// Meal Reserve domain schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum ReservationStatus {
+  ACTIVE
+  CANCELLED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  phone        String   @unique
+  passwordHash String
+  name         String
+  lastName     String   @default("")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  roles        UserRole[]
+  reservations Reservation[]
+  feedbacks    Feedback[]
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  route       String?
+  menuKey     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  roles RolePermission[]
+}
+
+model UserRole {
+  userId String
+  roleId String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+model MealPeriod {
+  id          String   @id @default(cuid())
+  title       String
+  startTime   String
+  endTime     String
+  description String?
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  menuItems    MenuItem[]
+  reservations Reservation[]
+}
+
+model Food {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  menuItems    MenuItem[]
+  reservations Reservation[]
+}
+
+model MenuItem {
+  id           String   @id @default(cuid())
+  date         DateTime
+  mealPeriodId String
+  foodId       String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  mealPeriod   MealPeriod    @relation(fields: [mealPeriodId], references: [id], onDelete: Cascade)
+  food         Food          @relation(fields: [foodId], references: [id], onDelete: Cascade)
+  reservations Reservation[]
+
+  @@unique([date, mealPeriodId, foodId])
+  @@index([date])
+  @@index([mealPeriodId])
+  @@index([foodId])
+}
+
+model Reservation {
+  id           String            @id @default(cuid())
+  userId       String
+  date         DateTime
+  mealPeriodId String
+  foodId       String
+  menuItemId   String?
+  status       ReservationStatus @default(ACTIVE)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealPeriod MealPeriod  @relation(fields: [mealPeriodId], references: [id])
+  food       Food        @relation(fields: [foodId], references: [id])
+  menuItem   MenuItem?   @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
+  feedback   Feedback?
+
+  @@unique([userId, date, mealPeriodId])
+  @@index([userId])
+  @@index([date])
+  @@index([status])
+  @@index([foodId])
+  @@index([mealPeriodId])
+}
+
+model Feedback {
+  id            String   @id @default(cuid())
+  reservationId String   @unique
+  userId        String
+  rating        Int
+  comment       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model AppSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

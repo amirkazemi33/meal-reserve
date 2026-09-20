@@ -16,6 +16,16 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Demo users
+
+After seeding (`npx prisma db seed`), you can log in with any of these accounts. Password for all: `password123`
+
+| Role     | Phone       | Name           |
+| -------- | ----------- | -------------- |
+| Admin    | 09000000001 | مدیر سیستم     |
+| Employee | 09000000002 | کارمند نمونه   |
+| Catering | 09000000003 | کاربر کترینگ   |
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

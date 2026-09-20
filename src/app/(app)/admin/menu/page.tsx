@@ -1,0 +1,174 @@
+import { getSession } from "@/lib/auth/session";
+import { redirectUnlessPermission } from "@/lib/rbac/can";
+import { PermissionCode } from "@/lib/auth/constants";
+import {
+  addDays,
+  eachDay,
+  formatDateKey,
+  formatDisplayDate,
+  getAllMealPeriods,
+  getFoods,
+  getMenuForRange,
+  parseDateKey,
+  startOfWeek,
+} from "@/lib/meals";
+import { setMenuFoodsAction } from "@/app/actions";
+import PersianDatePicker from "@/components/common/persian-date-picker";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import Link from "next/link";
+
+type SearchParams = Promise<{ week?: string }>;
+
+export default async function AdminMenuPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const session = await getSession();
+  redirectUnlessPermission(session, PermissionCode.MENU_MANAGE);
+
+  const params = await searchParams;
+  const anchor = params.week ? parseDateKey(params.week) : new Date();
+  const weekStart = startOfWeek(anchor);
+  const weekEnd = addDays(weekStart, 6);
+  const [mealPeriods, foods, menuItems] = await Promise.all([
+    getAllMealPeriods(),
+    getFoods(true),
+    getMenuForRange(weekStart, weekEnd),
+  ]);
+
+  const days = eachDay(weekStart, weekEnd);
+  const todayKey = formatDateKey(new Date());
+  const selected = new Set(
+    menuItems.map(
+      (item) =>
+        `${formatDateKey(item.date)}:${item.mealPeriodId}:${item.foodId}`,
+    ),
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">ساخت منو</h1>
+          <p className="text-muted-foreground text-sm">
+            برای هر روز و وعده، لیست غذاها را انتخاب کنید.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Link
+            href={`/admin/menu?week=${formatDateKey(addDays(weekStart, -7))}`}
+            className="border-border rounded-md border px-3 py-1.5 text-sm"
+          >
+            قبل
+          </Link>
+          <Link
+            href={`/admin/menu?week=${formatDateKey(addDays(weekStart, 7))}`}
+            className="border-border rounded-md border px-3 py-1.5 text-sm"
+          >
+            بعد
+          </Link>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        {days.map((date) => {
+          const dateKey = formatDateKey(date);
+          const isToday = dateKey === todayKey;
+          return (
+            <section
+              key={dateKey}
+              className={
+                isToday
+                  ? "space-y-3 rounded-2xl border border-emerald-700/25 bg-[linear-gradient(180deg,#ecfdf5_0%,#f0fdf4_55%,transparent_100%)] p-3 shadow-[0_1px_0_rgba(6,95,70,0.08)] sm:p-4"
+                  : "border-border/60 space-y-3 rounded-2xl border bg-[linear-gradient(180deg,#fafafa_0%,#ffffff_55%,transparent_100%)] p-3 shadow-[0_1px_0_rgba(0,0,0,0.04)] sm:p-4"
+              }
+            >
+              <h2
+                className={
+                  isToday
+                    ? "sticky top-0 z-10 -mx-1 flex items-center gap-2 rounded-lg border border-emerald-700/20 bg-[color-mix(in_oklch,#d1fae5_90%,transparent)] px-2 py-2 text-lg font-semibold text-emerald-950 backdrop-blur-sm"
+                    : "sticky top-0 z-10 -mx-1 flex items-center gap-2 rounded-lg border border-border/70 bg-[color-mix(in_oklch,var(--background)_90%,transparent)] px-2 py-2 text-lg font-semibold backdrop-blur-sm"
+                }
+              >
+                <span>{formatDisplayDate(date)}</span>
+                {isToday ? (
+                  <span className="rounded-md bg-emerald-800 px-2 py-0.5 text-xs font-medium text-emerald-50">
+                    امروز
+                  </span>
+                ) : null}
+              </h2>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {mealPeriods.map((period) => (
+                  <form
+                    key={`${dateKey}-${period.id}`}
+                    action={setMenuFoodsAction}
+                    className={
+                      isToday
+                        ? "space-y-3 rounded-xl border border-emerald-800/15 bg-white/85 p-4 shadow-sm"
+                        : "border-border/60 space-y-3 rounded-xl border bg-white/85 p-4 shadow-sm"
+                    }
+                  >
+                    <input type="hidden" name="date" value={dateKey} />
+                    <input
+                      type="hidden"
+                      name="mealPeriodId"
+                      value={period.id}
+                    />
+                    <p className="font-medium">
+                      {period.title}{" "}
+                      <span
+                        className="text-muted-foreground text-xs font-normal"
+                        dir="ltr"
+                      >
+                        {period.startTime}–{period.endTime}
+                      </span>
+                    </p>
+                    <div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
+                      {foods.map((food) => {
+                        const key = `${dateKey}:${period.id}:${food.id}`;
+                        return (
+                          <label
+                            key={food.id}
+                            className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-sm"
+                          >
+                            <input
+                              type="checkbox"
+                              name="foodIds"
+                              value={food.id}
+                              defaultChecked={selected.has(key)}
+                            />
+                            {food.title}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <Button type="submit" size="sm">
+                      ذخیره این وعده
+                    </Button>
+                  </form>
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </div>
+
+      <form className="flex items-end gap-2">
+        <div className="space-y-1">
+          <Label htmlFor="week">پرش به هفته (هر روزی از هفته)</Label>
+          <PersianDatePicker
+            id="week"
+            name="week"
+            defaultValue={formatDateKey(weekStart)}
+            placeholder="انتخاب تاریخ"
+          />
+        </div>
+        <Button type="submit" variant="outline">
+          برو
+        </Button>
+      </form>
+    </div>
+  );
+}
