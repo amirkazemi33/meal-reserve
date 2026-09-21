@@ -13,9 +13,21 @@ type NavItem = {
 };
 
 const NAV: NavItem[] = [
-  { href: "/menu", label: "منو", permission: PermissionCode.RESERVATION_CREATE },
-  { href: "/history", label: "سابقه", permission: PermissionCode.RESERVATION_CREATE },
-  { href: "/feedback", label: "نظرات", permission: PermissionCode.FEEDBACK_CREATE },
+  {
+    href: "/menu",
+    label: "منو",
+    permission: PermissionCode.RESERVATION_CREATE,
+  },
+  {
+    href: "/history",
+    label: "سابقه",
+    permission: PermissionCode.RESERVATION_CREATE,
+  },
+  {
+    href: "/feedback",
+    label: "نظرات",
+    permission: PermissionCode.FEEDBACK_CREATE,
+  },
   {
     href: "/cooking-report",
     label: "آمار پخت",
@@ -26,10 +38,26 @@ const NAV: NavItem[] = [
     label: "وعده‌ها",
     permission: PermissionCode.MEAL_PERIOD_MANAGE,
   },
-  { href: "/admin/foods", label: "غذاها", permission: PermissionCode.FOOD_MANAGE },
-  { href: "/admin/menu", label: "ساخت منو", permission: PermissionCode.MENU_MANAGE },
-  { href: "/admin/users", label: "کاربران", permission: PermissionCode.USERS_MANAGE },
-  { href: "/admin/roles", label: "نقش‌ها", permission: PermissionCode.ROLES_MANAGE },
+  {
+    href: "/admin/foods",
+    label: "غذاها",
+    permission: PermissionCode.FOOD_MANAGE,
+  },
+  {
+    href: "/admin/menu",
+    label: "ساخت منو",
+    permission: PermissionCode.MENU_MANAGE,
+  },
+  {
+    href: "/admin/users",
+    label: "کاربران",
+    permission: PermissionCode.USERS_MANAGE,
+  },
+  {
+    href: "/admin/roles",
+    label: "نقش‌ها",
+    permission: PermissionCode.ROLES_MANAGE,
+  },
   {
     href: "/admin/reports",
     label: "گزارش‌ها",
@@ -59,7 +87,7 @@ export default async function AppLayout({
   return (
     <div className="flex min-h-full flex-1 flex-col bg-[linear-gradient(180deg,#f4faf7_0%,#fafafa_40%,#fff8f0_100%)]">
       <header className="border-b border-border/60 bg-background/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mx-auto flex w-full max-w-[90rem] flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <Link href="/menu" className="text-lg font-semibold tracking-tight">
               رزرو غذا
@@ -74,7 +102,7 @@ export default async function AppLayout({
             </Button>
           </form>
         </div>
-        <nav className="mx-auto flex w-full max-w-6xl gap-1 overflow-x-auto px-4 pb-3">
+        <nav className="mx-auto flex w-full max-w-[90rem] gap-1 overflow-x-auto px-4 pb-3">
           {items.map((item) => (
             <Link
               key={item.href}
@@ -86,7 +114,9 @@ export default async function AppLayout({
           ))}
         </nav>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
+      <main className="mx-auto w-full max-w-[90rem] flex-1 px-4 py-6">
+        {children}
+      </main>
     </div>
   );
 }

@@ -141,9 +141,7 @@ export default async function MenuPage({
 
       <div
         className={
-          singleDay
-            ? "grid gap-4"
-            : "grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7"
+          singleDay ? "grid gap-4" : "grid gap-4 md:grid-cols-2 lg:grid-cols-3"
         }
       >
         {visibleDays.map(({ date, editable }) => {
@@ -152,10 +150,10 @@ export default async function MenuPage({
           const isFocusDay = dateKey === focusKey;
           const isClosed = !editable;
           const sectionClass = isFocusDay
-            ? "flex flex-col gap-3 rounded-xl border border-emerald-700/30 bg-[linear-gradient(180deg,#ecfdf5_0%,#ffffff_70%)] p-3 shadow-[0_1px_0_rgba(6,95,70,0.1)] ring-1 ring-emerald-600/10"
+            ? "flex flex-col gap-3 overflow-hidden rounded-xl border border-emerald-700/30 bg-[linear-gradient(180deg,#ecfdf5_0%,#ffffff_70%)] p-4 shadow-[0_1px_0_rgba(6,95,70,0.1)] ring-1 ring-emerald-600/10"
             : isClosed
-              ? "flex flex-col gap-3 rounded-xl border border-amber-700/25 bg-[linear-gradient(180deg,#fffbeb_0%,#ffffff_70%)] p-3 shadow-[0_1px_0_rgba(146,64,14,0.08)] ring-1 ring-amber-600/10"
-              : "border-border/70 bg-background/90 flex flex-col gap-3 rounded-xl border p-3 shadow-sm";
+              ? "flex flex-col gap-3 overflow-hidden rounded-xl border border-amber-700/25 bg-[linear-gradient(180deg,#fffbeb_0%,#ffffff_70%)] p-4 shadow-[0_1px_0_rgba(146,64,14,0.08)] ring-1 ring-amber-600/10"
+              : "border-border/70 bg-background/90 flex flex-col gap-3 overflow-hidden rounded-xl border p-4 shadow-sm";
           const titleClass = isFocusDay
             ? "text-sm font-semibold text-emerald-950"
             : isClosed
@@ -225,14 +223,18 @@ export default async function MenuPage({
                             return (
                               <li
                                 key={item.id}
-                                className="flex items-center justify-between gap-2 rounded-lg bg-muted/40 px-2 py-2"
+                                className={
+                                  selected
+                                    ? "border-primary/25 bg-primary/10 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
+                                    : "border-transparent bg-muted/40 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
+                                }
                               >
-                                <div>
+                                <div className="min-w-0 flex-1">
                                   <p className="text-sm font-medium">
                                     {item.food.title}
                                   </p>
                                   {item.food.description ? (
-                                    <p className="text-muted-foreground text-xs">
+                                    <p className="text-muted-foreground truncate text-xs">
                                       {item.food.description}
                                     </p>
                                   ) : null}

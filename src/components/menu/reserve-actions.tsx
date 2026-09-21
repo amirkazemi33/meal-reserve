@@ -2,10 +2,7 @@
 
 import { useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  cancelReservationAction,
-  reserveMenuItemAction,
-} from "@/app/actions";
+import { cancelReservationAction, reserveMenuItemAction } from "@/app/actions";
 
 export function ReserveButton({
   menuItemId,
@@ -24,6 +21,7 @@ export function ReserveButton({
       size="sm"
       variant={selected ? "default" : "outline"}
       disabled={disabled || pending}
+      className="shrink-0"
       onClick={() => {
         startTransition(async () => {
           await reserveMenuItemAction(menuItemId);
