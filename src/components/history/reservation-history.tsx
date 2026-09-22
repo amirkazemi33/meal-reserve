@@ -27,6 +27,11 @@ export type HistoryRow = {
   mealPeriodId: string;
   mealPeriodTitle: string;
   foodTitle: string;
+  quantity: number;
+  drinkTitle: string | null;
+  sideTitle: string | null;
+  deliveryLocationTitle: string;
+  deliveryLocationAddress: string;
   status: "ACTIVE" | "CANCELLED";
   userName: string;
   userLastName: string;
@@ -85,7 +90,11 @@ export function ReservationHistory({
       if (mealPeriodId !== "all" && row.mealPeriodId !== mealPeriodId) {
         return false;
       }
-      if (foodQ && !row.foodTitle.toLowerCase().includes(foodQ)) return false;
+      const foodHaystack = [row.foodTitle, row.drinkTitle, row.sideTitle]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      if (foodQ && !foodHaystack.includes(foodQ)) return false;
       if (nameQ && !row.userName.toLowerCase().includes(nameQ)) return false;
       if (lastNameQ && !row.userLastName.toLowerCase().includes(lastNameQ)) {
         return false;
@@ -130,7 +139,7 @@ export function ReservationHistory({
     });
   }
 
-  const colSpan = canChangeStatus ? 6 : 5;
+  const colSpan = canChangeStatus ? 8 : 7;
 
   return (
     <div className="space-y-4">
@@ -188,7 +197,9 @@ export function ReservationHistory({
                   id="history-from"
                   value={fromDate}
                   onChange={(date) =>
-                    setFromDate(typeof date === "string" ? date : (date[0] ?? ""))
+                    setFromDate(
+                      typeof date === "string" ? date : (date[0] ?? ""),
+                    )
                   }
                   maxDate={toDate || undefined}
                   placeholder="انتخاب تاریخ"
@@ -292,6 +303,8 @@ export function ReservationHistory({
               <TableHead className="text-center">کاربر</TableHead>
               <TableHead className="text-center">وعده</TableHead>
               <TableHead className="text-center">غذا</TableHead>
+              <TableHead className="text-center">تعداد</TableHead>
+              <TableHead className="text-center">محل تحویل</TableHead>
               <TableHead className="text-center">وضعیت</TableHead>
               {canChangeStatus && (
                 <TableHead className="text-center">عملیات</TableHead>
@@ -335,7 +348,32 @@ export function ReservationHistory({
                       {row.mealPeriodTitle}
                     </TableCell>
                     <TableCell className="text-center">
-                      {row.foodTitle}
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span>{row.foodTitle}</span>
+                        {row.drinkTitle ? (
+                          <span className="text-muted-foreground text-xs">
+                            نوشیدنی: {row.drinkTitle}
+                          </span>
+                        ) : null}
+                        {row.sideTitle ? (
+                          <span className="text-muted-foreground text-xs">
+                            ماست و سالاد: {row.sideTitle}
+                          </span>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {row.quantity}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span>{row.deliveryLocationTitle}</span>
+                        {row.deliveryLocationAddress ? (
+                          <span className="text-muted-foreground text-xs">
+                            {row.deliveryLocationAddress}
+                          </span>
+                        ) : null}
+                      </div>
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge

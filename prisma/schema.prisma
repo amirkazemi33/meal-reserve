@@ -14,19 +14,31 @@ enum ReservationStatus {
   CANCELLED
 }
 
-model User {
-  id           String   @id @default(cuid())
-  phone        String   @unique
-  passwordHash String
-  name         String
-  lastName     String   @default("")
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+enum FoodKind {
+  MAIN
+  DRINK
+  YOGURT_SALAD
+}
 
-  roles        UserRole[]
-  reservations Reservation[]
-  feedbacks    Feedback[]
+model User {
+  id                 String   @id @default(cuid())
+  phone              String   @unique
+  passwordHash       String
+  name               String
+  lastName           String   @default("")
+  isActive           Boolean  @default(true)
+  deliveryLocationId String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  deliveryLocation DeliveryLocation @relation(fields: [deliveryLocationId], references: [id])
+  roles            UserRole[]
+  reservations     Reservation[]
+  feedbacks        Feedback[]
+  ownedLists       UserList[]       @relation("UserListOwner")
+  listMemberships  UserListMember[]
+
+  @@index([deliveryLocationId])
 }
 
 model Role {
@@ -76,6 +88,19 @@ model RolePermission {
   @@index([permissionId])
 }
 
+model DeliveryLocation {
+  id          String   @id @default(cuid())
+  title       String
+  address     String
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users        User[]
+  reservations Reservation[]
+}
+
 model MealPeriod {
   id          String   @id @default(cuid())
   title       String
@@ -95,12 +120,17 @@ model Food {
   id          String   @id @default(cuid())
   title       String
   description String?
+  kind        FoodKind @default(MAIN)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  menuItems    MenuItem[]
-  reservations Reservation[]
+  menuItems         MenuItem[]
+  reservations      Reservation[] @relation("ReservationMainFood")
+  drinkReservations Reservation[] @relation("ReservationDrink")
+  sideReservations  Reservation[] @relation("ReservationSide")
+
+  @@index([kind])
 }
 
 model MenuItem {
@@ -111,9 +141,11 @@ model MenuItem {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  mealPeriod   MealPeriod    @relation(fields: [mealPeriodId], references: [id], onDelete: Cascade)
-  food         Food          @relation(fields: [foodId], references: [id], onDelete: Cascade)
-  reservations Reservation[]
+  mealPeriod        MealPeriod    @relation(fields: [mealPeriodId], references: [id], onDelete: Cascade)
+  food              Food          @relation(fields: [foodId], references: [id], onDelete: Cascade)
+  reservations      Reservation[] @relation("ReservationMainMenuItem")
+  drinkReservations Reservation[] @relation("ReservationDrinkMenuItem")
+  sideReservations  Reservation[] @relation("ReservationSideMenuItem")
 
   @@unique([date, mealPeriodId, foodId])
   @@index([date])
@@ -122,21 +154,32 @@ model MenuItem {
 }
 
 model Reservation {
-  id           String            @id @default(cuid())
-  userId       String
-  date         DateTime
-  mealPeriodId String
-  foodId       String
-  menuItemId   String?
-  status       ReservationStatus @default(ACTIVE)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  id                 String            @id @default(cuid())
+  userId             String
+  date               DateTime
+  mealPeriodId       String
+  foodId             String
+  menuItemId         String?
+  drinkFoodId        String?
+  drinkMenuItemId    String?
+  sideFoodId         String?
+  sideMenuItemId     String?
+  deliveryLocationId String
+  quantity           Int               @default(1)
+  status             ReservationStatus @default(ACTIVE)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mealPeriod MealPeriod  @relation(fields: [mealPeriodId], references: [id])
-  food       Food        @relation(fields: [foodId], references: [id])
-  menuItem   MenuItem?   @relation(fields: [menuItemId], references: [id], onDelete: SetNull)
-  feedback   Feedback?
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealPeriod       MealPeriod       @relation(fields: [mealPeriodId], references: [id])
+  food             Food             @relation("ReservationMainFood", fields: [foodId], references: [id])
+  menuItem         MenuItem?        @relation("ReservationMainMenuItem", fields: [menuItemId], references: [id], onDelete: SetNull)
+  drinkFood        Food?            @relation("ReservationDrink", fields: [drinkFoodId], references: [id], onDelete: SetNull)
+  drinkMenuItem    MenuItem?        @relation("ReservationDrinkMenuItem", fields: [drinkMenuItemId], references: [id], onDelete: SetNull)
+  sideFood         Food?            @relation("ReservationSide", fields: [sideFoodId], references: [id], onDelete: SetNull)
+  sideMenuItem     MenuItem?        @relation("ReservationSideMenuItem", fields: [sideMenuItemId], references: [id], onDelete: SetNull)
+  deliveryLocation DeliveryLocation @relation(fields: [deliveryLocationId], references: [id])
+  feedback         Feedback?
 
   @@unique([userId, date, mealPeriodId])
   @@index([userId])
@@ -144,6 +187,9 @@ model Reservation {
   @@index([status])
   @@index([foodId])
   @@index([mealPeriodId])
+  @@index([deliveryLocationId])
+  @@index([drinkFoodId])
+  @@index([sideFoodId])
 }
 
 model Feedback {
@@ -167,4 +213,30 @@ model AppSetting {
   value     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model UserList {
+  id          String   @id @default(cuid())
+  ownerId     String
+  title       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner   User             @relation("UserListOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members UserListMember[]
+
+  @@index([ownerId])
+}
+
+model UserListMember {
+  listId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  list UserList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([listId, userId])
+  @@index([userId])
 }

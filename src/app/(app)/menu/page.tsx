@@ -7,6 +7,7 @@ import {
   formatDateKey,
   formatDisplayDate,
   getAvailableMenuWeeks,
+  getDeliveryLocations,
   getNextReservableDate,
   getUserReservationsForRange,
   getWeeklyMenu,
@@ -14,8 +15,10 @@ import {
   startOfDay,
   startOfWeek,
 } from "@/lib/meals";
+import { prisma } from "@/lib/prisma";
 import { Badge } from "@/components/ui/badge";
-import { CancelButton, ReserveButton } from "@/components/menu/reserve-actions";
+import { Separator } from "@/components/ui/separator";
+import { MealPeriodReserveBlock } from "@/components/menu/meal-period-reserve-block";
 
 type SearchParams = Promise<{ week?: string; view?: string }>;
 
@@ -51,8 +54,26 @@ export default async function MenuPage({
   const requested = params.week ? parseDateKey(params.week) : new Date();
   const anchor = pickWeek(requested, availableWeeks);
 
-  const { days, mealPeriods, menuItems, cutoffTime, weekStart, weekEnd } =
-    await getWeeklyMenu(anchor);
+  const canSelectDeliveryLocation = can(
+    session,
+    PermissionCode.RESERVATION_SELECT_DELIVERY_LOCATION,
+  );
+  const canSetQuantity = can(session, PermissionCode.RESERVATION_QUANTITY);
+
+  const [
+    { days, mealPeriods, menuItems, cutoffTime, weekStart, weekEnd },
+    user,
+    deliveryLocations,
+  ] = await Promise.all([
+    getWeeklyMenu(anchor),
+    prisma.user.findUniqueOrThrow({
+      where: { id: session.userId },
+      select: { deliveryLocationId: true },
+    }),
+    canSelectDeliveryLocation
+      ? getDeliveryLocations(true)
+      : Promise.resolve([]),
+  ]);
 
   const reservations = await getUserReservationsForRange(
     session.userId,
@@ -84,6 +105,17 @@ export default async function MenuPage({
   const visibleDays = singleDay
     ? days.filter((d) => d.date.getDay() === focusWeekday)
     : days;
+
+  const locationOptions = deliveryLocations.map((location) => ({
+    id: location.id,
+    title: location.title,
+  }));
+
+  const fallbackLocationId = deliveryLocations.some(
+    (l) => l.id === user.deliveryLocationId,
+  )
+    ? user.deliveryLocationId
+    : (deliveryLocations[0]?.id ?? user.deliveryLocationId);
 
   const navLinkClass =
     "border-border bg-background hover:bg-muted rounded-md border px-3 py-1.5 text-sm";
@@ -188,7 +220,9 @@ export default async function MenuPage({
                 </Badge>
               </div>
 
-              <div className="space-y-3">
+              <Separator />
+
+              <div className="divide-y divide-border/70">
                 {mealPeriods.map((period) => {
                   const foods = menuItems.filter(
                     (item) =>
@@ -198,57 +232,32 @@ export default async function MenuPage({
                   const current = reservationBySlot.get(
                     `${dateKey}:${period.id}`,
                   );
+                  const slotDefaultLocationId =
+                    current?.deliveryLocationId ?? fallbackLocationId;
 
                   return (
-                    <div key={period.id} className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-medium tracking-wide opacity-70">
-                          {period.title}
-                        </p>
-                        {current ? (
-                          <CancelButton
-                            reservationId={current.id}
-                            disabled={!editable}
-                          />
-                        ) : null}
-                      </div>
-                      {foods.length === 0 ? (
-                        <p className="text-muted-foreground text-xs">
-                          غذایی ثبت نشده
-                        </p>
-                      ) : (
-                        <ul className="space-y-2">
-                          {foods.map((item) => {
-                            const selected = current?.foodId === item.foodId;
-                            return (
-                              <li
-                                key={item.id}
-                                className={
-                                  selected
-                                    ? "border-primary/25 bg-primary/10 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
-                                    : "border-transparent bg-muted/40 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
-                                }
-                              >
-                                <div className="min-w-0 flex-1">
-                                  <p className="text-sm font-medium">
-                                    {item.food.title}
-                                  </p>
-                                  {item.food.description ? (
-                                    <p className="text-muted-foreground truncate text-xs">
-                                      {item.food.description}
-                                    </p>
-                                  ) : null}
-                                </div>
-                                <ReserveButton
-                                  menuItemId={item.id}
-                                  disabled={!editable}
-                                  selected={selected}
-                                />
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      )}
+                    <div key={period.id} className="py-3 first:pt-0 last:pb-0">
+                      <MealPeriodReserveBlock
+                        periodTitle={period.title}
+                        quantityInputId={`quantity-${dateKey}-${period.id}`}
+                        editable={editable}
+                        selectedFoodId={current?.foodId}
+                        selectedDrinkMenuItemId={current?.drinkMenuItemId}
+                        selectedSideMenuItemId={current?.sideMenuItemId}
+                        reservationId={current?.id}
+                        canSelectDeliveryLocation={canSelectDeliveryLocation}
+                        canSetQuantity={canSetQuantity}
+                        quantity={current?.quantity ?? 1}
+                        deliveryLocations={locationOptions}
+                        defaultDeliveryLocationId={slotDefaultLocationId}
+                        foods={foods.map((item) => ({
+                          id: item.id,
+                          foodId: item.foodId,
+                          title: item.food.title,
+                          description: item.food.description,
+                          kind: item.food.kind,
+                        }))}
+                      />
                     </div>
                   );
                 })}

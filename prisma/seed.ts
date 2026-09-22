@@ -34,6 +34,12 @@ const permissions = [
     menuKey: "admin.meal-periods",
   },
   {
+    code: PermissionCode.DELIVERY_LOCATION_MANAGE,
+    name: "مدیریت محل‌های تحویل",
+    route: "/admin/delivery-locations",
+    menuKey: "admin.delivery-locations",
+  },
+  {
     code: PermissionCode.RESERVATION_CREATE,
     name: "ثبت رزرو",
     route: "/menu",
@@ -42,6 +48,24 @@ const permissions = [
   {
     code: PermissionCode.RESERVATION_CANCEL,
     name: "لغو رزرو",
+    route: "/menu",
+    menuKey: "menu",
+  },
+  {
+    code: PermissionCode.RESERVATION_FOR_OTHERS,
+    name: "رزرو برای دیگران",
+    route: "/admin/reserve-for",
+    menuKey: "admin.reserve-for",
+  },
+  {
+    code: PermissionCode.RESERVATION_SELECT_DELIVERY_LOCATION,
+    name: "انتخاب محل تحویل رزرو",
+    route: "/menu",
+    menuKey: "menu",
+  },
+  {
+    code: PermissionCode.RESERVATION_QUANTITY,
+    name: "تعداد",
     route: "/menu",
     menuKey: "menu",
   },
@@ -68,6 +92,12 @@ const permissions = [
     name: "مدیریت کاربران",
     route: "/admin/users",
     menuKey: "admin.users",
+  },
+  {
+    code: PermissionCode.USER_LIST_MANAGE,
+    name: "لیست کاربر",
+    route: "/admin/user-lists",
+    menuKey: "admin.user-lists",
   },
   {
     code: PermissionCode.ROLES_MANAGE,
@@ -166,6 +196,21 @@ async function main() {
     update: {},
   });
 
+  const defaultDeliveryLocation = await prisma.deliveryLocation.upsert({
+    where: { id: "seed-delivery-central" },
+    create: {
+      id: "seed-delivery-central",
+      title: "مرکزی",
+      address: "محل تحویل پیش‌فرض",
+      isActive: true,
+    },
+    update: {
+      title: "مرکزی",
+      address: "محل تحویل پیش‌فرض",
+      isActive: true,
+    },
+  });
+
   const adminRole = await prisma.role.findUniqueOrThrow({
     where: { code: RoleCode.ADMIN },
   });
@@ -208,12 +253,14 @@ async function main() {
         lastName: user.lastName,
         passwordHash,
         isActive: true,
+        deliveryLocationId: defaultDeliveryLocation.id,
       },
       update: {
         name: user.name,
         lastName: user.lastName,
         passwordHash,
         isActive: true,
+        deliveryLocationId: defaultDeliveryLocation.id,
       },
     });
 
@@ -299,7 +346,8 @@ async function main() {
     date.setDate(saturday.getDate() + i);
 
     for (const mealPeriod of [lunch, dinner]) {
-      const foodId = foodIds[(i + (mealPeriod.id === dinner.id ? 1 : 0)) % foodIds.length];
+      const foodId =
+        foodIds[(i + (mealPeriod.id === dinner.id ? 1 : 0)) % foodIds.length];
       await prisma.menuItem.upsert({
         where: {
           date_mealPeriodId_foodId: {
