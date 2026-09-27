@@ -24,33 +24,25 @@ async function hasValidSession(request: NextRequest): Promise<boolean> {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isLogin = pathname === "/login";
-  const isPublicAsset =
+  const isPublic =
+    pathname === "/login" ||
+    pathname === "/logout" ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.includes(".");
 
-  if (isPublicAsset) {
+  if (isPublic) {
     return NextResponse.next();
   }
 
-  const authenticated = await hasValidSession(request);
-
-  if (!authenticated && !isLogin) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    url.searchParams.set("next", pathname);
-    return NextResponse.redirect(url);
+  if (await hasValidSession(request)) {
+    return NextResponse.next();
   }
 
-  if (authenticated && isLogin) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/menu";
-    url.search = "";
-    return NextResponse.redirect(url);
-  }
-
-  return NextResponse.next();
+  const url = request.nextUrl.clone();
+  url.pathname = "/login";
+  url.searchParams.set("next", pathname);
+  return NextResponse.redirect(url);
 }
 
 export const config = {

@@ -66,7 +66,7 @@ export default async function MenuPage({
     deliveryLocations,
   ] = await Promise.all([
     getWeeklyMenu(anchor),
-    prisma.user.findUniqueOrThrow({
+    prisma.user.findUnique({
       where: { id: session.userId },
       select: { deliveryLocationId: true },
     }),
@@ -74,6 +74,10 @@ export default async function MenuPage({
       ? getDeliveryLocations(true)
       : Promise.resolve([]),
   ]);
+
+  if (!user) {
+    redirect("/logout");
+  }
 
   const reservations = await getUserReservationsForRange(
     session.userId,
