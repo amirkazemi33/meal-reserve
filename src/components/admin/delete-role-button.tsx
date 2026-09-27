@@ -1,36 +1,39 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { deleteUserAction } from "@/app/actions";
+import { deleteRoleAction } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 
-export function DeleteUserButton({
-  userId,
-  isSelf = false,
+export function DeleteRoleButton({
+  roleId,
+  roleName,
+  assignedUserCount,
 }: {
-  userId: string;
-  isSelf?: boolean;
+  roleId: string;
+  roleName: string;
+  assignedUserCount: number;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col items-start gap-1">
       <Button
         type="button"
         variant="destructive"
-        size="sm"
         disabled={pending}
         onClick={() => {
-          if (isSelf) {
-            setError("نمی‌توانید حساب خود را حذف کنید");
+          if (assignedUserCount > 0) {
+            setError(
+              `این نقش به ${assignedUserCount} کاربر اختصاص دارد و قابل حذف نیست.`,
+            );
             return;
           }
-          if (!confirm("این کاربر حذف شود؟")) return;
+          if (!confirm(`نقش «${roleName}» حذف شود؟`)) return;
           setError(null);
           startTransition(async () => {
             try {
-              const result = await deleteUserAction(userId);
+              const result = await deleteRoleAction(roleId);
               if (result?.error) setError(result.error);
             } catch (err) {
               setError(err instanceof Error ? err.message : "حذف ناموفق بود");
@@ -41,7 +44,7 @@ export function DeleteUserButton({
         {pending ? "در حال حذف…" : "حذف"}
       </Button>
       {error ? (
-        <p className="text-destructive max-w-48 text-end text-xs" role="alert">
+        <p className="text-destructive text-sm" role="alert">
           {error}
         </p>
       ) : null}

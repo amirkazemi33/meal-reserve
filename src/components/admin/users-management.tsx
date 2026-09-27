@@ -1,15 +1,18 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import {
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CirclePlus,
   Copy,
   Eye,
   EyeOff,
   FunnelX,
   ListFilterPlus,
+  Pencil,
   RefreshCw,
 } from "lucide-react";
 
@@ -28,6 +31,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { generatePassword } from "@/lib/auth/generate-password";
 import { cn } from "@/lib/utils";
 
@@ -36,23 +47,40 @@ export type UsersRoleOption = {
   name: string;
 };
 
+export type DeliveryLocationOption = {
+  id: string;
+  title: string;
+  isActive: boolean;
+};
+
 export type UsersListItem = {
   id: string;
   name: string;
   lastName: string;
   phone: string;
   isActive: boolean;
+  deliveryLocationId: string;
+  deliveryLocationTitle: string;
   roles: { roleId: string; role: { id: string; name: string } }[];
 };
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 
 type StatusFilter = "all" | "active" | "inactive";
 
 type UsersManagementProps = {
+  currentUserId: string;
   users: UsersListItem[];
   roles: UsersRoleOption[];
+  deliveryLocations: DeliveryLocationOption[];
 };
 
-export function UsersManagement({ users, roles }: UsersManagementProps) {
+export function UsersManagement({
+  currentUserId,
+  users,
+  roles,
+  deliveryLocations,
+}: UsersManagementProps) {
   const [search, setSearch] = useState("");
   const [roleId, setRoleId] = useState("all");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -62,6 +90,12 @@ export function UsersManagement({ users, roles }: UsersManagementProps) {
   const [showCreatePassword, setShowCreatePassword] = useState(false);
   const [passwordCopied, setPasswordCopied] = useState(false);
   const [creating, startCreate] = useTransition();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] =
+    useState<(typeof PAGE_SIZE_OPTIONS)[number]>(10);
+  const [editingUser, setEditingUser] = useState<UsersListItem | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [saving, startSave] = useTransition();
 
   function resetCreateForm() {
     setCreatePassword("");
@@ -109,6 +143,15 @@ export function UsersManagement({ users, roles }: UsersManagementProps) {
     });
   }, [users, search, roleId, status]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, roleId, status]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageStart = (currentPage - 1) * pageSize;
+  const pagedUsers = filteredUsers.slice(pageStart, pageStart + pageSize);
+
   function resetFilters() {
     setSearch("");
     setRoleId("all");
@@ -122,6 +165,18 @@ export function UsersManagement({ users, roles }: UsersManagementProps) {
     });
   }
 
+  function openEdit(user: UsersListItem) {
+    setEditingUser(user);
+    setEditOpen(true);
+  }
+
+  function handleSave(formData: FormData) {
+    startSave(async () => {
+      await upsertUserAction(formData);
+      setEditOpen(false);
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -132,7 +187,10 @@ export function UsersManagement({ users, roles }: UsersManagementProps) {
           </p>
         </div>
         <Button type="button" onClick={() => setCreateOpen(true)}>
-          <CirclePlus className="size-4 text-green-700" data-icon="inline-start" />
+          <CirclePlus
+            className="size-4 text-green-700"
+            data-icon="inline-start"
+          />
           کاربر جدید
         </Button>
       </div>
@@ -143,7 +201,7 @@ export function UsersManagement({ users, roles }: UsersManagementProps) {
           "**:data-[slot=input]:bg-background [&_input]:bg-background [&_select]:bg-background",
           filtersOpen
             ? "border-b border-[#aeaeae] py-3 lg:py-4"
-            : "py-1 lg:py-2"
+            : "py-1 lg:py-2",
         )}
       >
         <CardContent className="flex flex-col gap-3 px-2 lg:px-4">
@@ -160,7 +218,7 @@ export function UsersManagement({ users, roles }: UsersManagementProps) {
                 <ChevronDown
                   className={cn(
                     "size-4 transition-transform",
-                    filtersOpen && "rotate-180"
+                    filtersOpen && "rotate-180",
                   )}
                 />
               </Button>
@@ -263,6 +321,27 @@ export function UsersManagement({ users, roles }: UsersManagementProps) {
                 className="text-left"
               />
             </div>
+            <div className="space-y-1">
+              <Label htmlFor="create-delivery-location">محل تحویل</Label>
+              <select
+                id="create-delivery-location"
+                name="deliveryLocationId"
+                required
+                className="border-input h-8 w-full rounded-lg border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                defaultValue={
+                  deliveryLocations.find((l) => l.isActive)?.id ??
+                  deliveryLocations[0]?.id ??
+                  ""
+                }
+              >
+                {deliveryLocations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.title}
+                    {!location.isActive ? " (غیرفعال)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
             <label className="flex items-center gap-2 self-end pb-1 text-sm">
               <input type="checkbox" name="isActive" defaultChecked />
               فعال
@@ -347,100 +426,258 @@ export function UsersManagement({ users, roles }: UsersManagementProps) {
         </DialogContent>
       </Dialog>
 
-      <div className="space-y-4">
-        {filteredUsers.length === 0 ? (
-          <p className="text-muted-foreground rounded-xl border border-dashed p-8 text-center text-sm">
-            کاربری با این فیلترها پیدا نشد.
-          </p>
-        ) : (
-          filteredUsers.map((user) => {
-            const roleIds = new Set(user.roles.map((r) => r.roleId));
-            return (
-              <form
-                key={user.id}
-                action={upsertUserAction}
-                className="border-border/70 grid gap-3 rounded-xl border bg-background/90 p-4 sm:grid-cols-2"
+      <div className="space-y-3">
+        <div className="border-border/70 overflow-hidden rounded-xl border bg-background/90">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>نام</TableHead>
+                <TableHead>نام خانوادگی</TableHead>
+                <TableHead>شماره موبایل</TableHead>
+                <TableHead>محل تحویل</TableHead>
+                <TableHead>نقش‌ها</TableHead>
+                <TableHead>وضعیت</TableHead>
+                <TableHead className="text-end">عملیات</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pagedUsers.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={7}
+                    className="text-muted-foreground text-center"
+                  >
+                    کاربری با این فیلترها پیدا نشد.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                pagedUsers.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>{user.name}</TableCell>
+                    <TableCell>{user.lastName}</TableCell>
+                    <TableCell dir="ltr" className="text-left">
+                      {user.phone}
+                    </TableCell>
+                    <TableCell>{user.deliveryLocationTitle}</TableCell>
+                    <TableCell className="whitespace-normal">
+                      <div className="flex flex-wrap gap-1">
+                        {user.roles.length === 0 ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : (
+                          user.roles.map((ur) => (
+                            <Badge key={ur.roleId} variant="secondary">
+                              {ur.role.name}
+                            </Badge>
+                          ))
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={user.isActive ? "success" : "outline"}>
+                        {user.isActive ? "فعال" : "غیرفعال"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-end">
+                      <div className="flex items-start justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openEdit(user)}
+                        >
+                          <Pencil data-icon="inline-start" />
+                          تدوین
+                        </Button>
+                        <DeleteUserButton
+                          userId={user.id}
+                          isSelf={user.id === currentUserId}
+                        />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {filteredUsers.length > 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="users-page-size">تعداد در صفحه</Label>
+              <select
+                id="users-page-size"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(
+                    Number(e.target.value) as (typeof PAGE_SIZE_OPTIONS)[number],
+                  );
+                  setPage(1);
+                }}
+                className="border-input h-8 rounded-lg border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               >
-                <input type="hidden" name="id" value={user.id} />
-                <div className="flex flex-wrap gap-2 sm:col-span-2">
-                  <Badge variant={user.isActive ? "success" : "outline"}>
-                    {user.isActive ? "فعال" : "غیرفعال"}
-                  </Badge>
-                  {user.roles.map((ur) => (
-                    <Badge key={ur.roleId} variant="secondary">
-                      {ur.role.name}
-                    </Badge>
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="outline"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                title="صفحه قبل"
+              >
+                <ChevronRight className="size-4" />
+              </Button>
+              <span className="text-muted-foreground min-w-20 text-center">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="outline"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                title="صفحه بعد"
+              >
+                <ChevronLeft className="size-4" />
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {editOpen && editingUser ? (
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          if (!saving) setEditOpen(open);
+        }}
+      >
+        <DialogContent className="max-h-[95vh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>تدوین کاربر</DialogTitle>
+            <DialogDescription>
+              {editingUser
+                ? `${editingUser.name} ${editingUser.lastName}`
+                : "اطلاعات کاربر را ویرایش کنید."}
+            </DialogDescription>
+          </DialogHeader>
+
+            <form
+              key={editingUser.id}
+              action={handleSave}
+              className="grid gap-3 sm:grid-cols-2"
+            >
+              <input type="hidden" name="id" value={editingUser.id} />
+              <div className="space-y-1">
+                <Label htmlFor="edit-name">نام</Label>
+                <Input
+                  id="edit-name"
+                  name="name"
+                  defaultValue={editingUser.name}
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-last-name">نام خانوادگی</Label>
+                <Input
+                  id="edit-last-name"
+                  name="lastName"
+                  defaultValue={editingUser.lastName}
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-phone">شماره موبایل</Label>
+                <Input
+                  id="edit-phone"
+                  name="phone"
+                  defaultValue={editingUser.phone}
+                  required
+                  dir="ltr"
+                  className="text-left"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-delivery-location">محل تحویل</Label>
+                <select
+                  id="edit-delivery-location"
+                  name="deliveryLocationId"
+                  required
+                  defaultValue={editingUser.deliveryLocationId}
+                  className="border-input h-8 w-full rounded-lg border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  {deliveryLocations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.title}
+                      {!location.isActive ? " (غیرفعال)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="edit-password">رمز جدید (اختیاری)</Label>
+                <Input
+                  id="edit-password"
+                  name="password"
+                  type="password"
+                  dir="ltr"
+                  className="text-left"
+                  autoComplete="new-password"
+                />
+              </div>
+              <label className="flex items-center gap-2 self-end text-sm">
+                <input
+                  type="checkbox"
+                  name="isActive"
+                  defaultChecked={editingUser.isActive}
+                />
+                فعال
+              </label>
+              <div className="space-y-2 sm:col-span-2">
+                <Label>نقش‌ها</Label>
+                <div className="flex flex-wrap gap-3">
+                  {roles.map((role) => (
+                    <label
+                      key={role.id}
+                      className="flex items-center gap-2 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        name="roleIds"
+                        value={role.id}
+                        defaultChecked={editingUser.roles.some(
+                          (item) => item.roleId === role.id,
+                        )}
+                      />
+                      {role.name}
+                    </label>
                   ))}
                 </div>
-                <div className="space-y-1">
-                  <Label>نام</Label>
-                  <Input name="name" defaultValue={user.name} required />
-                </div>
-                <div className="space-y-1">
-                  <Label>نام خانوادگی</Label>
-                  <Input
-                    name="lastName"
-                    defaultValue={user.lastName}
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>شماره موبایل</Label>
-                  <Input
-                    name="phone"
-                    defaultValue={user.phone}
-                    required
-                    dir="ltr"
-                    className="text-left"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>رمز جدید (اختیاری)</Label>
-                  <Input
-                    name="password"
-                    type="password"
-                    dir="ltr"
-                    className="text-left"
-                  />
-                </div>
-                <label className="flex items-center gap-2 self-end text-sm">
-                  <input
-                    type="checkbox"
-                    name="isActive"
-                    defaultChecked={user.isActive}
-                  />
-                  فعال
-                </label>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label>نقش‌ها</Label>
-                  <div className="flex flex-wrap gap-3">
-                    {roles.map((role) => (
-                      <label
-                        key={role.id}
-                        className="flex items-center gap-2 text-sm"
-                      >
-                        <input
-                          type="checkbox"
-                          name="roleIds"
-                          value={role.id}
-                          defaultChecked={roleIds.has(role.id)}
-                        />
-                        {role.name}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-2 sm:col-span-2">
-                  <Button type="submit" variant="outline">
-                    ذخیره
-                  </Button>
-                  <DeleteUserButton userId={user.id} />
-                </div>
-              </form>
-            );
-          })
-        )}
-      </div>
+              </div>
+              <DialogFooter className="sm:col-span-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditOpen(false)}
+                  disabled={saving}
+                >
+                  انصراف
+                </Button>
+                <Button type="submit" disabled={saving}>
+                  {saving ? "در حال ذخیره…" : "تأیید"}
+                </Button>
+              </DialogFooter>
+            </form>
+        </DialogContent>
+      </Dialog>
+      ) : null}
     </div>
   );
 }

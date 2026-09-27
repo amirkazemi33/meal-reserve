@@ -3,6 +3,7 @@ import { redirectUnlessPermission } from "@/lib/rbac/can";
 import { PermissionCode } from "@/lib/auth/constants";
 import { prisma } from "@/lib/prisma";
 import { upsertRoleAction } from "@/app/actions";
+import { DeleteRoleButton } from "@/components/admin/delete-role-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +15,10 @@ export default async function RolesPage() {
 
   const [roles, permissions] = await Promise.all([
     prisma.role.findMany({
-      include: { permissions: true },
+      include: {
+        permissions: true,
+        _count: { select: { users: true } },
+      },
       orderBy: { name: "asc" },
     }),
     prisma.permission.findMany({ orderBy: { code: "asc" } }),
@@ -148,9 +152,16 @@ export default async function RolesPage() {
                   ))}
                 </div>
               </div>
-              <Button type="submit" variant="outline" className="w-fit">
-                ذخیره
-              </Button>
+              <div className="flex flex-wrap items-start gap-2">
+                <Button type="submit" variant="outline" className="w-fit">
+                  ذخیره
+                </Button>
+                <DeleteRoleButton
+                  roleId={role.id}
+                  roleName={role.name}
+                  assignedUserCount={role._count.users}
+                />
+              </div>
             </form>
           );
         })}

@@ -13,6 +13,7 @@ import {
   startOfWeek,
 } from "@/lib/meals";
 import { setMenuFoodsAction } from "@/app/actions";
+import { FOOD_KIND_OPTIONS } from "@/lib/meals/food-kind";
 import PersianDatePicker from "@/components/common/persian-date-picker";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -53,7 +54,7 @@ export default async function AdminMenuPage({
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">ساخت منو</h1>
           <p className="text-muted-foreground text-sm">
-            برای هر روز و وعده، لیست غذاها را انتخاب کنید.
+            برای هر روز و وعده، غذا، نوشیدنی، و ماست و سالاد را انتخاب کنید.
           </p>
         </div>
         <div className="flex gap-2">
@@ -125,22 +126,37 @@ export default async function AdminMenuPage({
                         {period.startTime}–{period.endTime}
                       </span>
                     </p>
-                    <div className="grid max-h-48 gap-2 overflow-y-auto sm:grid-cols-2">
-                      {foods.map((food) => {
-                        const key = `${dateKey}:${period.id}:${food.id}`;
+                    <div className="space-y-3">
+                      {FOOD_KIND_OPTIONS.map((group) => {
+                        const groupFoods = foods.filter(
+                          (food) => food.kind === group.value,
+                        );
+                        if (groupFoods.length === 0) return null;
                         return (
-                          <label
-                            key={food.id}
-                            className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-sm"
-                          >
-                            <input
-                              type="checkbox"
-                              name="foodIds"
-                              value={food.id}
-                              defaultChecked={selected.has(key)}
-                            />
-                            {food.title}
-                          </label>
+                          <div key={group.value} className="space-y-2">
+                            <p className="text-muted-foreground text-xs font-medium">
+                              {group.label}
+                            </p>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              {groupFoods.map((food) => {
+                                const key = `${dateKey}:${period.id}:${food.id}`;
+                                return (
+                                  <label
+                                    key={food.id}
+                                    className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-sm"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      name="foodIds"
+                                      value={food.id}
+                                      defaultChecked={selected.has(key)}
+                                    />
+                                    {food.title}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </div>
                         );
                       })}
                     </div>
