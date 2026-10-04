@@ -40,7 +40,8 @@ interface PersianDatePickerProps {
   minDate?: string;
   maxDate?: string;
   className?: string;
-  datePickerProps?: Partial<DatePickerProps>;
+  /** `zIndex` is applied by the library but omitted from its published types. */
+  datePickerProps?: Partial<DatePickerProps> & { zIndex?: number };
   calendarProps?: Partial<CalendarProps>;
 }
 
