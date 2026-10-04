@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { can, redirectUnlessPermission } from "@/lib/rbac/can";
 import { PermissionCode } from "@/lib/auth/constants";
@@ -14,6 +13,15 @@ import {
 import { ReserveForOthers } from "@/components/admin/reserve-for-others";
 
 type SearchParams = Promise<{ date?: string }>;
+
+function formatClock(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return new Intl.DateTimeFormat("fa-IR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(2020, 0, 1, hours || 0, minutes || 0));
+}
 
 export default async function ReserveForOthersPage({
   searchParams,
@@ -48,6 +56,7 @@ export default async function ReserveForOthersPage({
     .map((period) => ({
       id: period.id,
       title: period.title,
+      servingLabel: `سرو ${formatClock(period.startTime)} تا ${formatClock(period.endTime)}`,
       foods: dailyMenu.menuItems
         .filter((item) => item.mealPeriodId === period.id)
         .map((item) => ({
@@ -62,23 +71,13 @@ export default async function ReserveForOthersPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            رزرو برای دیگران
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            انتخاب تاریخ، کاربران یا لیست، سپس ثبت یکسان وعده‌ها برای همه.
-          </p>
-        </div>
-        {can(session, PermissionCode.REPORT_RESERVATIONS) ? (
-          <Link
-            href={`/admin/reports?date=${encodeURIComponent(dateKey)}`}
-            className="border-border bg-background hover:bg-muted rounded-md border px-3 py-1.5 text-sm"
-          >
-            مدیریت رزروها
-          </Link>
-        ) : null}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          رزرو برای دیگران
+        </h1>
+        <p className="text-muted-foreground text-sm">
+          انتخاب تاریخ، کاربران یا لیست، سپس ثبت یکسان وعده‌ها برای همه.
+        </p>
       </div>
 
       <ReserveForOthers

@@ -15,6 +15,7 @@ export const PermissionCode = {
   RESERVATION_SELECT_DELIVERY_LOCATION: "reservation.select_delivery_location",
   RESERVATION_QUANTITY: "reservation.quantity",
   FEEDBACK_CREATE: "feedback.create",
+  FEEDBACK_MANAGE: "feedback.manage",
   REPORT_COOKING: "report.cooking",
   REPORT_RESERVATIONS: "report.reservations",
   USERS_MANAGE: "users.manage",

@@ -1,8 +1,10 @@
 import { getSession } from "@/lib/auth/session";
 import { redirectUnlessPermission } from "@/lib/rbac/can";
 import { PermissionCode } from "@/lib/auth/constants";
-import { getDeliveryLocations } from "@/lib/meals";
+import { getDeliveryLocationsForAdmin } from "@/lib/meals";
 import { upsertDeliveryLocationAction } from "@/app/actions";
+import { DeleteDeliveryLocationButton } from "@/components/admin/delete-delivery-location-button";
+import { PendingSubmitButton } from "@/components/admin/pending-submit-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 export default async function DeliveryLocationsPage() {
   const session = await getSession();
   redirectUnlessPermission(session, PermissionCode.DELIVERY_LOCATION_MANAGE);
-  const locations = await getDeliveryLocations(false);
+  const locations = await getDeliveryLocationsForAdmin();
 
   return (
     <div className="space-y-8">
@@ -86,9 +88,19 @@ export default async function DeliveryLocationsPage() {
               />
               فعال
             </label>
-            <Button type="submit" variant="outline" className="w-fit">
-              ذخیره
-            </Button>
+            <div className="flex flex-wrap items-start gap-2">
+              <PendingSubmitButton
+                variant="outline"
+                className="w-fit"
+                idleLabel="ذخیره"
+              />
+              <DeleteDeliveryLocationButton
+                locationId={location.id}
+                title={location.title}
+                userCount={location._count.users}
+                reservationCount={location._count.reservations}
+              />
+            </div>
           </form>
         ))}
       </div>

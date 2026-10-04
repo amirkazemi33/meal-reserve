@@ -1,12 +1,9 @@
-import Image from "next/image";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
-import { logoutAction } from "@/lib/auth/actions";
 import { can } from "@/lib/rbac/can";
 import { PermissionCode } from "@/lib/auth/constants";
-import { Button } from "@/components/ui/button";
-import { AppNav } from "@/components/layout/app-nav";
+import { AppBottomNav } from "@/components/layout/app-bottom-nav";
+import { AppHeader } from "@/components/layout/app-header";
 
 type NavItem = {
   href: string;
@@ -76,6 +73,11 @@ const NAV: NavItem[] = [
     permission: PermissionCode.REPORT_RESERVATIONS,
   },
   {
+    href: "/admin/feedback",
+    label: "مدیریت نظرات و پیشنهادات",
+    permission: PermissionCode.FEEDBACK_MANAGE,
+  },
+  {
     href: "/admin/reserve-for",
     label: "رزرو برای دیگران",
     permission: PermissionCode.RESERVATION_FOR_OTHERS,
@@ -101,48 +103,15 @@ export default async function AppLayout({
     (item) => !item.permission || can(session, item.permission),
   );
 
+  const navItems = items.map(({ href, label }) => ({ href, label }));
+
   return (
-    <div className="flex min-h-full flex-1 flex-col bg-[linear-gradient(180deg,#f4faf7_0%,#fafafa_40%,#fff8f0_100%)]">
-      <header className="border-b border-border/60 bg-background/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[90rem] flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/menu"
-              className="flex shrink-0 items-center"
-              aria-label="رزرو غذا"
-            >
-              <Image
-                src="/logo.png"
-                alt="رزرو غذا"
-                width={40}
-                height={40}
-                className="rounded-lg"
-                priority
-              />
-            </Link>
-            <div>
-              <Link
-                href="/menu"
-                className="text-lg font-semibold tracking-tight"
-              >
-                رزرو غذا
-              </Link>
-              <p className="text-muted-foreground text-sm">
-                {session.name} · {session.phone}
-              </p>
-            </div>
-          </div>
-          <form action={logoutAction}>
-            <Button type="submit" variant="outline" size="sm">
-              خروج
-            </Button>
-          </form>
-        </div>
-        <AppNav items={items.map(({ href, label }) => ({ href, label }))} />
-      </header>
-      <main className="mx-auto w-full max-w-[90rem] flex-1 px-4 py-6">
+    <div className="bg-booking-page flex min-h-full flex-1 flex-col">
+      <AppHeader name={session.name} items={navItems} />
+      <main className="mx-auto w-full max-w-[90rem] flex-1 px-4 py-4 pb-24 md:pb-6">
         {children}
       </main>
+      <AppBottomNav items={navItems} />
     </div>
   );
 }

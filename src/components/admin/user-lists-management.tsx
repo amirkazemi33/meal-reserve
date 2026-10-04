@@ -121,6 +121,7 @@ export function UserListsManagement({ lists }: UserListsManagementProps) {
               <div className="flex flex-wrap gap-2">
                 <Button
                   variant="outline"
+                  nativeButton={false}
                   render={<Link href={`/admin/user-lists/${list.id}`} />}
                 >
                   اعضا

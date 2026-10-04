@@ -6,13 +6,13 @@ import { ChevronDown, FunnelX, ListFilterPlus } from "lucide-react";
 
 import { reserveForOthersAction } from "@/app/actions";
 import PersianDatePicker from "@/components/common/persian-date-picker";
-import { ReservationQuantityInput } from "@/components/menu/reservation-quantity-input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FOOD_KINDS, type FoodKindValue } from "@/lib/meals/food-kind";
+import { parseReservationQuantity } from "@/lib/meals/quantity";
 import { cn } from "@/lib/utils";
 
 export type ReserveForUserOption = {
@@ -40,6 +40,7 @@ export type ReserveForMenuFood = {
 export type ReserveForMenuPeriod = {
   id: string;
   title: string;
+  servingLabel: string;
   foods: ReserveForMenuFood[];
 };
 
@@ -123,16 +124,85 @@ function draftHasSelection(draft: MealDraft) {
   );
 }
 
-function ChoiceList({
+function periodStatus(editable: boolean, selected: boolean) {
+  if (!editable) {
+    return {
+      label: "گذشته یا بسته",
+      dot: "bg-booking-fill",
+      text: "text-booking-secondary",
+    };
+  }
+  if (selected) {
+    return {
+      label: "انتخاب شده",
+      dot: "bg-booking-reserved",
+      text: "text-booking-reserved",
+    };
+  }
+  return {
+    label: "قابل رزرو",
+    dot: "bg-booking-brand",
+    text: "text-booking-brand",
+  };
+}
+
+function BookingFoodRow({
   title,
-  noneLabel,
+  description,
+  selected,
+  disabled,
+  onClick,
+}: {
+  title: string;
+  description?: string | null;
+  selected: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-3 rounded-[10px] p-3 transition-all",
+        selected
+          ? "bg-booking-fill-soft shadow-[inset_0_0_0_1.5px_var(--booking-text)]"
+          : "bg-transparent shadow-[inset_0_0_0_1px_var(--booking-line)]",
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-booking text-[15px] leading-snug font-medium">
+          {title}
+        </p>
+        {description ? (
+          <p className="text-booking-secondary mt-0.5 text-xs leading-relaxed">
+            {description}
+          </p>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={onClick}
+        className={cn(
+          "h-[38px] shrink-0 rounded-[10px] px-[18px] text-[13px] font-medium whitespace-nowrap transition-transform active:scale-95 disabled:cursor-not-allowed disabled:opacity-50",
+          selected
+            ? "text-booking-cancel bg-white shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--booking-cancel)_35%,transparent)]"
+            : "bg-booking-brand text-booking-on-brand shadow-[0_6px_18px_rgb(13_71_161/0.28)]",
+        )}
+      >
+        {selected ? "لغو" : "ثبت"}
+      </button>
+    </div>
+  );
+}
+
+function BookingChoiceList({
+  title,
   items,
   selectedId,
   disabled,
   onSelect,
 }: {
   title: string;
-  noneLabel: string;
   items: ReserveForMenuFood[];
   selectedId: string;
   disabled: boolean;
@@ -141,61 +211,21 @@ function ChoiceList({
   if (items.length === 0) return null;
 
   return (
-    <div className="space-y-2">
-      <p className="text-muted-foreground text-xs font-medium">{title}</p>
-      <ul className="space-y-2">
-        <li
-          className={
-            selectedId === ""
-              ? "border-primary/25 bg-primary/10 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-              : "border-transparent bg-muted/40 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-          }
-        >
-          <p className="text-sm">{noneLabel}</p>
-          <Button
-            type="button"
-            size="sm"
-            variant={selectedId === "" ? "default" : "outline"}
+    <div className="flex flex-col gap-2">
+      <p className="text-booking-heading text-sm font-semibold">{title}</p>
+      {items.map((item) => {
+        const selected = selectedId === item.menuItemId;
+        return (
+          <BookingFoodRow
+            key={item.menuItemId}
+            title={item.title}
+            description={item.description}
+            selected={selected}
             disabled={disabled}
-            className="shrink-0"
-            onClick={() => onSelect("")}
-          >
-            {selectedId === "" ? "انتخاب‌شده" : "انتخاب"}
-          </Button>
-        </li>
-        {items.map((item) => {
-          const selected = selectedId === item.menuItemId;
-          return (
-            <li
-              key={item.menuItemId}
-              className={
-                selected
-                  ? "border-primary/25 bg-primary/10 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-                  : "border-transparent bg-muted/40 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-              }
-            >
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">{item.title}</p>
-                {item.description ? (
-                  <p className="text-muted-foreground truncate text-xs">
-                    {item.description}
-                  </p>
-                ) : null}
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant={selected ? "default" : "outline"}
-                disabled={disabled}
-                className="shrink-0"
-                onClick={() => onSelect(item.menuItemId)}
-              >
-                {selected ? "انتخاب‌شده" : "انتخاب"}
-              </Button>
-            </li>
-          );
-        })}
-      </ul>
+            onClick={() => onSelect(selected ? "" : item.menuItemId)}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -208,6 +238,7 @@ function MealDraftEditor({
   editable,
   pending,
   canSetQuantity,
+  showQuantity = true,
   canSelectDeliveryLocation,
   deliveryLocations,
   quantityInputId,
@@ -222,6 +253,7 @@ function MealDraftEditor({
   editable: boolean;
   pending: boolean;
   canSetQuantity: boolean;
+  showQuantity?: boolean;
   canSelectDeliveryLocation: boolean;
   deliveryLocations: { id: string; title: string }[];
   quantityInputId: string;
@@ -245,60 +277,32 @@ function MealDraftEditor({
     });
   }
 
+  const quantityLabel = new Intl.NumberFormat("fa-IR").format(draft.quantity);
+  const locationTitle =
+    deliveryLocations.find((location) => location.id === draft.locationId)
+      ?.title ??
+    (showDefaultLocationOption
+      ? (defaultLocationLabel ?? "پیش‌فرض کاربر")
+      : "—");
+  const controlsDisabled = !editable || pending;
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-base font-semibold">{title}</h2>
-          {description ? (
-            <p className="text-muted-foreground text-xs">{description}</p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          {canSetQuantity ? (
-            <div className="flex items-center gap-2">
-              <Label htmlFor={quantityInputId} className="text-xs">
-                تعداد
-              </Label>
-              <ReservationQuantityInput
-                id={quantityInputId}
-                value={draft.quantity}
-                disabled={!editable || pending}
-                onChange={(quantity) => onChange({ quantity })}
-              />
-            </div>
-          ) : null}
-          {canSelectDeliveryLocation && deliveryLocations.length > 0 ? (
-            <div className="space-y-1">
-              <Label className="text-xs">محل تحویل</Label>
-              <select
-                value={draft.locationId}
-                disabled={!editable || pending}
-                onChange={(e) => onChange({ locationId: e.target.value })}
-                className="border-input h-8 min-w-40 rounded-lg border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
-              >
-                {showDefaultLocationOption ? (
-                  <option value="">
-                    {defaultLocationLabel ?? "پیش‌فرض کاربر"}
-                  </option>
-                ) : null}
-                {deliveryLocations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-        </div>
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-booking-heading text-base font-semibold">
+          {title}
+        </h2>
+        {description ? (
+          <p className="text-booking-secondary text-xs">{description}</p>
+        ) : null}
       </div>
 
       {mealPeriods.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-booking-secondary text-sm">
           برای این تاریخ منویی ثبت نشده است.
         </p>
       ) : (
-        <div className="space-y-6">
+        <div className="flex flex-col gap-3">
           {mealPeriods.map((period) => {
             const selection = draft.selections[period.id] ?? {
               mainMenuItemId: "",
@@ -314,82 +318,208 @@ function MealDraftEditor({
             const sides = period.foods.filter(
               (food) => food.kind === FOOD_KINDS.YOGURT_SALAD,
             );
+            const selectedMain = mains.find(
+              (item) => item.menuItemId === selection.mainMenuItemId,
+            );
+            const selectedDrink = drinks.find(
+              (item) => item.menuItemId === selection.drinkMenuItemId,
+            );
+            const selectedSide = sides.find(
+              (item) => item.menuItemId === selection.sideMenuItemId,
+            );
+            const status = periodStatus(editable, Boolean(selectedMain));
 
             return (
               <section
                 key={period.id}
-                className="border-border/70 space-y-3 rounded-xl border p-4"
+                className="rounded-xl bg-white shadow-[0_0_0_1px_var(--booking-line),0_8px_24px_rgb(0_0_0/0.05)]"
               >
-                <p className="text-sm font-semibold tracking-wide">
-                  {period.title}
-                </p>
+                <div className="flex items-center justify-between gap-3 px-[18px] py-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <span className="text-booking-heading text-xl font-semibold tracking-tight">
+                        {period.title}
+                      </span>
+                      <span
+                        className={cn(
+                          "flex items-center gap-1.5 text-xs whitespace-nowrap",
+                          status.text,
+                        )}
+                      >
+                        <span
+                          className={cn("size-1.5 rounded-full", status.dot)}
+                        />
+                        {status.label}
+                      </span>
+                    </div>
+                    <p className="text-booking-secondary text-xs whitespace-nowrap">
+                      {period.servingLabel}
+                    </p>
+                  </div>
+                  {canSetQuantity && showQuantity ? (
+                    <div className="bg-booking-fill-soft flex shrink-0 items-center gap-2 rounded-xl p-1">
+                      <button
+                        type="button"
+                        aria-label="افزایش تعداد"
+                        disabled={controlsDisabled}
+                        onClick={() =>
+                          onChange({
+                            quantity: parseReservationQuantity(
+                              draft.quantity + 1,
+                            ),
+                          })
+                        }
+                        className="bg-booking text-booking-on-brand flex size-[34px] items-center justify-center rounded-[9px] text-lg active:scale-90 disabled:opacity-50"
+                      >
+                        +
+                      </button>
+                      <span
+                        id={`${quantityInputId}-${period.id}`}
+                        className="text-booking min-w-11 text-center text-sm font-semibold whitespace-nowrap"
+                      >
+                        {quantityLabel} پرس
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="کاهش تعداد"
+                        disabled={controlsDisabled}
+                        onClick={() =>
+                          onChange({
+                            quantity: parseReservationQuantity(
+                              draft.quantity - 1,
+                            ),
+                          })
+                        }
+                        className="text-booking-secondary flex size-[34px] items-center justify-center rounded-[9px] bg-white text-lg active:scale-90 disabled:opacity-50"
+                      >
+                        −
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
 
-                {mains.length === 0 ? (
-                  <p className="text-muted-foreground text-xs">
-                    غذای اصلی ثبت نشده
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {mains.map((item) => {
-                      const selected =
-                        selection.mainMenuItemId === item.menuItemId;
-                      return (
-                        <li
-                          key={item.menuItemId}
-                          className={
-                            selected
-                              ? "border-primary/25 bg-primary/10 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
-                              : "border-transparent bg-muted/40 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
-                          }
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium">{item.title}</p>
-                            {item.description ? (
-                              <p className="text-muted-foreground truncate text-xs">
-                                {item.description}
-                              </p>
-                            ) : null}
-                          </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={selected ? "default" : "outline"}
-                            disabled={!editable || pending}
-                            className="shrink-0"
+                <div className="border-booking-line flex flex-col gap-[18px] border-t px-[18px] pt-3.5 pb-[18px]">
+                  {canSelectDeliveryLocation && deliveryLocations.length > 0 ? (
+                    <label className="flex min-w-0 items-center gap-2.5">
+                      <span className="text-booking-secondary shrink-0 text-xs whitespace-nowrap">
+                        محل تحویل
+                      </span>
+                      <select
+                        value={draft.locationId}
+                        disabled={controlsDisabled}
+                        onChange={(event) =>
+                          onChange({ locationId: event.target.value })
+                        }
+                        className="bg-booking-fill-soft text-booking h-11 min-w-0 flex-1 rounded-[10px] border-none px-3 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-[var(--booking-brand)]/30 disabled:opacity-50"
+                      >
+                        {showDefaultLocationOption ? (
+                          <option value="">
+                            {defaultLocationLabel ?? "پیش‌فرض کاربر"}
+                          </option>
+                        ) : null}
+                        {deliveryLocations.map((location) => (
+                          <option key={location.id} value={location.id}>
+                            {location.title}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
+
+                  {mains.length === 0 ? (
+                    <p className="text-booking-secondary text-xs">
+                      غذایی ثبت نشده
+                    </p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {mains.map((item) => {
+                        const selected =
+                          selection.mainMenuItemId === item.menuItemId;
+                        return (
+                          <BookingFoodRow
+                            key={item.menuItemId}
+                            title={item.title}
+                            description={item.description}
+                            selected={selected}
+                            disabled={controlsDisabled}
                             onClick={() =>
                               updatePeriod(period.id, {
-                                mainMenuItemId: item.menuItemId,
+                                mainMenuItemId: selected ? "" : item.menuItemId,
                               })
                             }
-                          >
-                            {selected ? "انتخاب‌شده" : "انتخاب"}
-                          </Button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
 
-                <ChoiceList
-                  title="نوشیدنی"
-                  noneLabel="بدون نوشیدنی"
-                  items={drinks}
-                  selectedId={selection.drinkMenuItemId}
-                  disabled={!editable || pending}
-                  onSelect={(menuItemId) =>
-                    updatePeriod(period.id, { drinkMenuItemId: menuItemId })
-                  }
-                />
-                <ChoiceList
-                  title="ماست و سالاد"
-                  noneLabel="بدون ماست و سالاد"
-                  items={sides}
-                  selectedId={selection.sideMenuItemId}
-                  disabled={!editable || pending}
-                  onSelect={(menuItemId) =>
-                    updatePeriod(period.id, { sideMenuItemId: menuItemId })
-                  }
-                />
+                  <BookingChoiceList
+                    title="نوشیدنی"
+                    items={drinks}
+                    selectedId={selection.drinkMenuItemId}
+                    disabled={controlsDisabled}
+                    onSelect={(menuItemId) =>
+                      updatePeriod(period.id, { drinkMenuItemId: menuItemId })
+                    }
+                  />
+                  <BookingChoiceList
+                    title="ماست و سالاد"
+                    items={sides}
+                    selectedId={selection.sideMenuItemId}
+                    disabled={controlsDisabled}
+                    onSelect={(menuItemId) =>
+                      updatePeriod(period.id, { sideMenuItemId: menuItemId })
+                    }
+                  />
+
+                  {selectedMain ? (
+                    <div className="bg-booking-fill-soft flex flex-col gap-2.5 rounded-[10px] p-3.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-booking-heading text-xs font-semibold">
+                          خلاصه‌ی سفارش {period.title}
+                        </span>
+                        <span className="text-booking-reserved text-[11px] font-medium">
+                          انتخاب شده
+                        </span>
+                      </div>
+                      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-xs">
+                        {(
+                          [
+                            { label: "غذا", value: selectedMain.title },
+                            ...(canSetQuantity && showQuantity
+                              ? [
+                                  {
+                                    label: "تعداد",
+                                    value: `${quantityLabel} پرس`,
+                                  },
+                                ]
+                              : []),
+                            {
+                              label: "نوشیدنی",
+                              value: selectedDrink?.title ?? "—",
+                            },
+                            {
+                              label: "مخلفات",
+                              value: selectedSide?.title ?? "—",
+                            },
+                            ...(canSelectDeliveryLocation
+                              ? [{ label: "محل تحویل", value: locationTitle }]
+                              : []),
+                          ] as { label: string; value: string }[]
+                        ).map((line) => (
+                          <div key={line.label} className="contents">
+                            <dt className="text-booking-secondary whitespace-nowrap">
+                              {line.label}
+                            </dt>
+                            <dd className="text-booking font-medium">
+                              {line.value}
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  ) : null}
+                </div>
               </section>
             );
           })}
@@ -844,55 +974,45 @@ export function ReserveForOthers({
       </div>
 
       {mealMode === "shared" ? (
-        <Card>
-          <CardContent className="space-y-5 pt-6">
-            <MealDraftEditor
-              title="وعده‌های روز"
-              description="انتخاب یکسان برای همه کاربران · رزرو قبلی همان وعده جایگزین می‌شود"
-              draft={sharedDraft}
-              mealPeriods={mealPeriods}
-              editable={editable}
-              pending={pending}
-              canSetQuantity={canSetQuantity}
-              canSelectDeliveryLocation={canSelectDeliveryLocation}
-              deliveryLocations={deliveryLocations}
-              quantityInputId="proxy-quantity-shared"
-              defaultLocationLabel="پیش‌فرض هر کاربر"
-              showDefaultLocationOption
-              onChange={patchSharedDraft}
-            />
-          </CardContent>
-        </Card>
+        <MealDraftEditor
+          title="وعده‌های روز"
+          description="انتخاب یکسان برای همه کاربران · رزرو قبلی همان وعده جایگزین می‌شود"
+          draft={sharedDraft}
+          mealPeriods={mealPeriods}
+          editable={editable}
+          pending={pending}
+          canSetQuantity={canSetQuantity}
+          showQuantity={false}
+          canSelectDeliveryLocation={canSelectDeliveryLocation}
+          deliveryLocations={deliveryLocations}
+          quantityInputId="proxy-quantity-shared"
+          defaultLocationLabel="پیش‌فرض هر کاربر"
+          showDefaultLocationOption
+          onChange={patchSharedDraft}
+        />
       ) : targetUsers.length === 0 ? (
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-muted-foreground text-sm">
-              ابتدا کاربران یا لیست را انتخاب کنید.
-            </p>
-          </CardContent>
-        </Card>
+        <p className="text-booking-secondary text-sm">
+          ابتدا کاربران یا لیست را انتخاب کنید.
+        </p>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-8">
           {targetUsers.map((user) => {
             const draft = draftForUser(user);
             return (
-              <Card key={user.id}>
-                <CardContent className="space-y-5 pt-6">
-                  <MealDraftEditor
-                    title={`${user.name} ${user.lastName}`}
-                    description={user.phone}
-                    draft={draft}
-                    mealPeriods={mealPeriods}
-                    editable={editable}
-                    pending={pending}
-                    canSetQuantity={canSetQuantity}
-                    canSelectDeliveryLocation={canSelectDeliveryLocation}
-                    deliveryLocations={deliveryLocations}
-                    quantityInputId={`proxy-quantity-${user.id}`}
-                    onChange={(patch) => patchUserDraft(user.id, patch)}
-                  />
-                </CardContent>
-              </Card>
+              <MealDraftEditor
+                key={user.id}
+                title={`${user.name} ${user.lastName}`}
+                description={user.phone}
+                draft={draft}
+                mealPeriods={mealPeriods}
+                editable={editable}
+                pending={pending}
+                canSetQuantity={canSetQuantity}
+                canSelectDeliveryLocation={canSelectDeliveryLocation}
+                deliveryLocations={deliveryLocations}
+                quantityInputId={`proxy-quantity-${user.id}`}
+                onChange={(patch) => patchUserDraft(user.id, patch)}
+              />
             );
           })}
         </div>

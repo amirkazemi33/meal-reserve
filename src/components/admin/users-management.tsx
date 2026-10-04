@@ -8,8 +8,6 @@ import {
   ChevronRight,
   CirclePlus,
   Copy,
-  Eye,
-  EyeOff,
   FunnelX,
   ListFilterPlus,
   Pencil,
@@ -31,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   Table,
   TableBody,
@@ -81,8 +80,11 @@ export function UsersManagement({
   roles,
   deliveryLocations,
 }: UsersManagementProps) {
-  const [search, setSearch] = useState("");
+  const [nameSearch, setNameSearch] = useState("");
+  const [lastNameSearch, setLastNameSearch] = useState("");
+  const [phoneSearch, setPhoneSearch] = useState("");
   const [roleId, setRoleId] = useState("all");
+  const [deliveryLocationId, setDeliveryLocationId] = useState("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -127,25 +129,48 @@ export function UsersManagement({
   }
 
   const filteredUsers = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const name = nameSearch.trim().toLowerCase();
+    const lastName = lastNameSearch.trim().toLowerCase();
+    const phone = phoneSearch.trim().toLowerCase();
     return users.filter((user) => {
-      if (q) {
-        const haystack =
-          `${user.name} ${user.lastName} ${user.phone}`.toLowerCase();
-        if (!haystack.includes(q)) return false;
+      if (name && !user.name.toLowerCase().includes(name)) return false;
+      if (lastName && !user.lastName.toLowerCase().includes(lastName)) {
+        return false;
       }
+      if (phone && !user.phone.toLowerCase().includes(phone)) return false;
       if (roleId !== "all" && !user.roles.some((r) => r.roleId === roleId)) {
+        return false;
+      }
+      if (
+        deliveryLocationId !== "all" &&
+        user.deliveryLocationId !== deliveryLocationId
+      ) {
         return false;
       }
       if (status === "active" && !user.isActive) return false;
       if (status === "inactive" && user.isActive) return false;
       return true;
     });
-  }, [users, search, roleId, status]);
+  }, [
+    users,
+    nameSearch,
+    lastNameSearch,
+    phoneSearch,
+    roleId,
+    deliveryLocationId,
+    status,
+  ]);
 
   useEffect(() => {
     setPage(1);
-  }, [search, roleId, status]);
+  }, [
+    nameSearch,
+    lastNameSearch,
+    phoneSearch,
+    roleId,
+    deliveryLocationId,
+    status,
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
   const currentPage = Math.min(page, totalPages);
@@ -153,8 +178,11 @@ export function UsersManagement({
   const pagedUsers = filteredUsers.slice(pageStart, pageStart + pageSize);
 
   function resetFilters() {
-    setSearch("");
+    setNameSearch("");
+    setLastNameSearch("");
+    setPhoneSearch("");
     setRoleId("all");
+    setDeliveryLocationId("all");
     setStatus("all");
   }
 
@@ -246,14 +274,33 @@ export function UsersManagement({
           </div>
 
           {filtersOpen && (
-            <div className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid items-end gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="space-y-1">
-                <Label htmlFor="user-search">جستجو</Label>
+                <Label htmlFor="user-name">نام</Label>
                 <Input
-                  id="user-search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="نام، نام خانوادگی یا موبایل"
+                  id="user-name"
+                  value={nameSearch}
+                  onChange={(e) => setNameSearch(e.target.value)}
+                  placeholder="جستجوی نام"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="user-last-name">نام خانوادگی</Label>
+                <Input
+                  id="user-last-name"
+                  value={lastNameSearch}
+                  onChange={(e) => setLastNameSearch(e.target.value)}
+                  placeholder="جستجوی نام خانوادگی"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="user-phone">شماره موبایل</Label>
+                <Input
+                  id="user-phone"
+                  value={phoneSearch}
+                  onChange={(e) => setPhoneSearch(e.target.value)}
+                  placeholder="جستجوی موبایل"
+                  dir="ltr"
                 />
               </div>
               <div className="space-y-1">
@@ -268,6 +315,23 @@ export function UsersManagement({
                   {roles.map((role) => (
                     <option key={role.id} value={role.id}>
                       {role.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="user-delivery-location-filter">محل تحویل</Label>
+                <select
+                  id="user-delivery-location-filter"
+                  value={deliveryLocationId}
+                  onChange={(e) => setDeliveryLocationId(e.target.value)}
+                  className="border-input h-8 w-full rounded-lg border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <option value="all">همه محل‌ها</option>
+                  {deliveryLocations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.title}
+                      {!location.isActive ? " (غیرفعال)" : ""}
                     </option>
                   ))}
                 </select>
@@ -360,29 +424,22 @@ export function UsersManagement({
                 </Button>
               </div>
               <div className="flex gap-2">
-                <Input
+                <PasswordInput
                   id="create-password"
                   name="password"
-                  type={showCreatePassword ? "text" : "password"}
                   value={createPassword}
                   onChange={(e) => {
                     setCreatePassword(e.target.value);
                     setPasswordCopied(false);
                   }}
+                  visible={showCreatePassword}
+                  onVisibleChange={setShowCreatePassword}
                   required
                   dir="ltr"
-                  className="flex-1 text-left font-mono"
+                  wrapperClassName="flex-1"
+                  className="text-left font-mono"
                   autoComplete="new-password"
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setShowCreatePassword((v) => !v)}
-                  title={showCreatePassword ? "مخفی کردن" : "نمایش رمز"}
-                >
-                  {showCreatePassword ? <EyeOff /> : <Eye />}
-                </Button>
                 <Button
                   type="button"
                   variant="outline"
@@ -510,7 +567,9 @@ export function UsersManagement({
                 value={pageSize}
                 onChange={(e) => {
                   setPageSize(
-                    Number(e.target.value) as (typeof PAGE_SIZE_OPTIONS)[number],
+                    Number(
+                      e.target.value,
+                    ) as (typeof PAGE_SIZE_OPTIONS)[number],
                   );
                   setPage(1);
                 }}
@@ -553,21 +612,21 @@ export function UsersManagement({
       </div>
 
       {editOpen && editingUser ? (
-      <Dialog
-        open={editOpen}
-        onOpenChange={(open) => {
-          if (!saving) setEditOpen(open);
-        }}
-      >
-        <DialogContent className="max-h-[95vh] overflow-y-auto sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>تدوین کاربر</DialogTitle>
-            <DialogDescription>
-              {editingUser
-                ? `${editingUser.name} ${editingUser.lastName}`
-                : "اطلاعات کاربر را ویرایش کنید."}
-            </DialogDescription>
-          </DialogHeader>
+        <Dialog
+          open={editOpen}
+          onOpenChange={(open) => {
+            if (!saving) setEditOpen(open);
+          }}
+        >
+          <DialogContent className="max-h-[95vh] overflow-y-auto sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>تدوین کاربر</DialogTitle>
+              <DialogDescription>
+                {editingUser
+                  ? `${editingUser.name} ${editingUser.lastName}`
+                  : "اطلاعات کاربر را ویرایش کنید."}
+              </DialogDescription>
+            </DialogHeader>
 
             <form
               key={editingUser.id}
@@ -623,10 +682,9 @@ export function UsersManagement({
               </div>
               <div className="space-y-1">
                 <Label htmlFor="edit-password">رمز جدید (اختیاری)</Label>
-                <Input
+                <PasswordInput
                   id="edit-password"
                   name="password"
-                  type="password"
                   dir="ltr"
                   className="text-left"
                   autoComplete="new-password"
@@ -675,8 +733,8 @@ export function UsersManagement({
                 </Button>
               </DialogFooter>
             </form>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
       ) : null}
     </div>
   );

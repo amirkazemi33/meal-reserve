@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, FunnelX, ListFilterPlus, Pencil } from "lucide-react";
 
@@ -29,8 +29,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { ReservationQuantityInput } from "@/components/menu/reservation-quantity-input";
-import { FOOD_KINDS, type FoodKindValue } from "@/lib/meals/food-kind";
+import { MealCard, type MealCardCommit } from "@/components/menu/meal-card";
+import type { FoodKindValue } from "@/lib/meals/food-kind";
 import { cn } from "@/lib/utils";
 
 export type ReservationReportRow = {
@@ -81,73 +81,24 @@ export type DayMenuPeriodOption = {
   foods: DayMenuFoodOption[];
 };
 
-function AddonChoices({
-  title,
-  noneLabel,
-  items,
-  selectedId,
-  pending,
-  onSelect,
-}: {
-  title: string;
-  noneLabel: string;
-  items: DayMenuFoodOption[];
-  selectedId: string;
-  pending: boolean;
-  onSelect: (menuItemId: string) => void;
-}) {
-  if (items.length === 0) return null;
+function formatClock(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return new Intl.DateTimeFormat("fa-IR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(2020, 0, 1, hours || 0, minutes || 0));
+}
 
+function resolveMenuItemId(
+  foods: DayMenuFoodOption[],
+  menuItemId: string | null | undefined,
+  foodId: string | null | undefined,
+) {
   return (
-    <div className="space-y-2">
-      <p className="text-muted-foreground text-xs font-medium">{title}</p>
-      <ul className="space-y-2">
-        <li
-          className={
-            selectedId === ""
-              ? "border-primary/25 bg-primary/10 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-              : "border-transparent bg-muted/40 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-          }
-        >
-          <p className="text-sm">{noneLabel}</p>
-          <Button
-            type="button"
-            size="sm"
-            variant={selectedId === "" ? "default" : "outline"}
-            disabled={pending}
-            className="shrink-0"
-            onClick={() => onSelect("")}
-          >
-            {selectedId === "" ? "انتخاب‌شده" : "انتخاب"}
-          </Button>
-        </li>
-        {items.map((item) => {
-          const selected = selectedId === item.menuItemId;
-          return (
-            <li
-              key={item.menuItemId}
-              className={
-                selected
-                  ? "border-primary/25 bg-primary/10 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-                  : "border-transparent bg-muted/40 flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
-              }
-            >
-              <p className="text-sm font-medium">{item.title}</p>
-              <Button
-                type="button"
-                size="sm"
-                variant={selected ? "default" : "outline"}
-                disabled={pending}
-                className="shrink-0"
-                onClick={() => onSelect(item.menuItemId)}
-              >
-                {selected ? "انتخاب‌شده" : "انتخاب"}
-              </Button>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+    foods.find((food) => food.menuItemId === menuItemId)?.menuItemId ??
+    foods.find((food) => food.foodId === foodId)?.menuItemId ??
+    null
   );
 }
 
@@ -155,7 +106,12 @@ type ReservationsReportTableProps = {
   rows: ReservationReportRow[];
   deliveryLocations: DeliveryLocationOption[];
   menusByDate?: Record<string, DayMenuPeriodOption[]>;
-  mealPeriods?: { id: string; title: string }[];
+  mealPeriods?: {
+    id: string;
+    title: string;
+    startTime: string;
+    endTime: string;
+  }[];
   userLists?: UserListFilterOption[];
   fromDateKey: string;
   toDateKey: string;
@@ -184,6 +140,8 @@ export function ReservationsReportTable({
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [selectedFromDate, setSelectedFromDate] = useState(fromDateKey);
   const [selectedToDate, setSelectedToDate] = useState(toDateKey);
+  const [seenFromDate, setSeenFromDate] = useState(fromDateKey);
+  const [seenToDate, setSeenToDate] = useState(toDateKey);
   const [mealPeriodId, setMealPeriodId] = useState("all");
   const [userListId, setUserListId] = useState("all");
   const [foodSearch, setFoodSearch] = useState("");
@@ -193,19 +151,13 @@ export function ReservationsReportTable({
   const [editingRow, setEditingRow] = useState<ReservationReportRow | null>(
     null,
   );
-  const [editLocationId, setEditLocationId] = useState("");
-  const [editMealPeriodId, setEditMealPeriodId] = useState("");
-  const [editMenuItemId, setEditMenuItemId] = useState("");
-  const [editDrinkMenuItemId, setEditDrinkMenuItemId] = useState("");
-  const [editSideMenuItemId, setEditSideMenuItemId] = useState("");
-  const [editQuantity, setEditQuantity] = useState(1);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const editDayMenuPeriods = editingRow
-    ? (menusByDate[editingRow.dateKey] ?? [])
-    : [];
   const periodOptions = mealPeriods;
+  const activeRow = editingRow
+    ? (rows.find((row) => row.id === editingRow.id) ?? editingRow)
+    : null;
 
   const selectedListMemberIds = useMemo(() => {
     if (userListId === "all") return null;
@@ -213,10 +165,15 @@ export function ReservationsReportTable({
     return new Set(list?.memberUserIds ?? []);
   }, [userListId, userLists]);
 
-  useEffect(() => {
+  if (fromDateKey !== seenFromDate) {
+    setSeenFromDate(fromDateKey);
     setSelectedFromDate(fromDateKey);
+  }
+
+  if (toDateKey !== seenToDate) {
+    setSeenToDate(toDateKey);
     setSelectedToDate(toDateKey);
-  }, [fromDateKey, toDateKey]);
+  }
 
   const filteredRows = useMemo(() => {
     const foodQ = foodSearch.trim().toLowerCase();
@@ -252,19 +209,14 @@ export function ReservationsReportTable({
     phoneSearch,
   ]);
 
-  const editFoods = useMemo(() => {
-    return (
-      editDayMenuPeriods.find((period) => period.id === editMealPeriodId)
-        ?.foods ?? []
-    );
-  }, [editDayMenuPeriods, editMealPeriodId]);
-  const editMainFoods = editFoods.filter(
-    (food) => food.kind === FOOD_KINDS.MAIN,
-  );
-  const editDrinks = editFoods.filter((food) => food.kind === FOOD_KINDS.DRINK);
-  const editSides = editFoods.filter(
-    (food) => food.kind === FOOD_KINDS.YOGURT_SALAD,
-  );
+  const activePeriodFoods = activeRow
+    ? (menusByDate[activeRow.dateKey]?.find(
+      (period) => period.id === activeRow.mealPeriodId,
+    )?.foods ?? [])
+    : [];
+  const activeMealPeriod = activeRow
+    ? mealPeriods.find((period) => period.id === activeRow.mealPeriodId)
+    : undefined;
 
   function resetFilters() {
     setMealPeriodId("all");
@@ -277,7 +229,7 @@ export function ReservationsReportTable({
 
   function navigateDateRange(nextFrom: string, nextTo: string) {
     if (!nextFrom) return;
-    let from = nextFrom;
+    const from = nextFrom;
     let to = nextTo || nextFrom;
     if (to < from) {
       to = from;
@@ -305,66 +257,31 @@ export function ReservationsReportTable({
     navigateDateRange(nextFrom, next);
   }
 
-  function pickMenuItemId(
-    foods: DayMenuFoodOption[],
-    menuItemId: string | null | undefined,
-    foodId: string | null | undefined,
-  ) {
-    return (
-      foods.find((food) => food.menuItemId === menuItemId)?.menuItemId ??
-      foods.find((food) => food.foodId === foodId)?.menuItemId ??
-      ""
-    );
-  }
-
-  function applyPeriodSelection(row: ReservationReportRow) {
-    const dayMenus = menusByDate[row.dateKey] ?? [];
-    const period = dayMenus.find((item) => item.id === row.mealPeriodId);
-    const foods = period?.foods ?? [];
-    const mains = foods.filter((food) => food.kind === FOOD_KINDS.MAIN);
-    const drinks = foods.filter((food) => food.kind === FOOD_KINDS.DRINK);
-    const sides = foods.filter((food) => food.kind === FOOD_KINDS.YOGURT_SALAD);
-    setEditMealPeriodId(row.mealPeriodId);
-    setEditMenuItemId(
-      pickMenuItemId(mains, undefined, row.foodId) ||
-        mains[0]?.menuItemId ||
-        "",
-    );
-    setEditDrinkMenuItemId(
-      pickMenuItemId(drinks, row.drinkMenuItemId, row.drinkFoodId),
-    );
-    setEditSideMenuItemId(
-      pickMenuItemId(sides, row.sideMenuItemId, row.sideFoodId),
-    );
-  }
-
   function openEditDialog(row: ReservationReportRow) {
     setEditingRow(row);
-    setEditLocationId(row.deliveryLocationId);
-    setEditQuantity(row.quantity ?? 1);
-    applyPeriodSelection(row);
     setError(null);
   }
 
-  function handleSave() {
-    if (!editingRow || !editMenuItemId || !editLocationId) return;
-    setError(null);
-    startTransition(async () => {
+  const commitEditedReservation = useCallback(
+    async (input: MealCardCommit) => {
+      if (!editingRow) return;
+      setError(null);
       try {
         await updateAdminReservationAction(
           editingRow.id,
-          editMenuItemId,
-          editLocationId,
-          editDrinkMenuItemId || null,
-          editSideMenuItemId || null,
-          canSetQuantity ? editQuantity : null,
+          input.menuItemId,
+          input.deliveryLocationId ?? editingRow.deliveryLocationId,
+          input.drinkMenuItemId,
+          input.sideMenuItemId,
+          canSetQuantity ? input.quantity : null,
         );
-        setEditingRow(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "ذخیره ناموفق بود");
+        throw err;
       }
-    });
-  }
+    },
+    [editingRow, canSetQuantity],
+  );
 
   function handleDelete() {
     if (!editingRow) return;
@@ -596,114 +513,69 @@ export function ReservationsReportTable({
           <DialogHeader>
             <DialogTitle>تدوین رزرو</DialogTitle>
             <DialogDescription>
-              {editingRow
-                ? `${editingRow.userName} ${editingRow.userLastName} · ${editingRow.userPhone}`
+              {activeRow
+                ? `${activeRow.userName} ${activeRow.userLastName} · ${activeRow.userPhone}`
                 : null}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <Label htmlFor="edit-delivery-location">محل تحویل</Label>
-              <select
-                id="edit-delivery-location"
-                value={editLocationId}
-                disabled={pending || deliveryLocations.length === 0}
-                onChange={(e) => setEditLocationId(e.target.value)}
-                className="border-input h-8 w-full rounded-lg border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
-              >
-                {deliveryLocations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <section className="flex flex-col gap-3 overflow-hidden rounded-xl border border-emerald-700/30 bg-[linear-gradient(180deg,#ecfdf5_0%,#ffffff_70%)] p-4 shadow-[0_1px_0_rgba(6,95,70,0.1)] ring-1 ring-emerald-600/10">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-semibold tracking-wide text-emerald-950">
-                  {editDayMenuPeriods.find(
-                    (period) => period.id === editMealPeriodId,
-                  )?.title ??
-                    editingRow?.mealPeriodTitle ??
-                    "وعده"}
-                </p>
-                {canSetQuantity ? (
-                  <ReservationQuantityInput
-                    id="edit-reservation-quantity"
-                    value={editQuantity}
-                    disabled={pending}
-                    onChange={setEditQuantity}
-                  />
-                ) : null}
-              </div>
-
-              {editMainFoods.length === 0 ? (
-                <p className="text-muted-foreground text-xs">غذایی ثبت نشده</p>
-              ) : (
-                <ul className="space-y-2">
-                  {editMainFoods.map((item) => {
-                    const selected = editMenuItemId === item.menuItemId;
-                    return (
-                      <li
-                        key={item.menuItemId}
-                        className={
-                          selected
-                            ? "border-primary/25 bg-primary/10 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
-                            : "border-transparent bg-muted/40 flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5"
-                        }
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium">{item.title}</p>
-                          {item.description ? (
-                            <p className="text-muted-foreground truncate text-xs">
-                              {item.description}
-                            </p>
-                          ) : null}
-                        </div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant={selected ? "default" : "outline"}
-                          disabled={pending}
-                          className="shrink-0"
-                          onClick={() => setEditMenuItemId(item.menuItemId)}
-                        >
-                          {selected ? "انتخاب‌شده" : "انتخاب"}
-                        </Button>
-                      </li>
-                    );
-                  })}
-                </ul>
+          {activeRow ? (
+            <MealCard
+              key={activeRow.id}
+              periodTitle={activeMealPeriod?.title ?? activeRow.mealPeriodTitle}
+              servingLabel={
+                activeMealPeriod
+                  ? `سرو ${formatClock(activeMealPeriod.startTime)} تا ${formatClock(activeMealPeriod.endTime)}`
+                  : ""
+              }
+              quantityInputId={`edit-quantity-${activeRow.id}`}
+              foods={activePeriodFoods.map((food) => ({
+                id: food.menuItemId,
+                foodId: food.foodId,
+                title: food.title,
+                description: food.description,
+                kind: food.kind,
+              }))}
+              editable
+              selectedFoodId={activeRow.foodId}
+              selectedDrinkMenuItemId={resolveMenuItemId(
+                activePeriodFoods,
+                activeRow.drinkMenuItemId,
+                activeRow.drinkFoodId,
               )}
+              selectedSideMenuItemId={resolveMenuItemId(
+                activePeriodFoods,
+                activeRow.sideMenuItemId,
+                activeRow.sideFoodId,
+              )}
+              reservationId={activeRow.id}
+              canSelectDeliveryLocation={deliveryLocations.length > 0}
+              canSetQuantity={canSetQuantity}
+              quantity={activeRow.quantity}
+              deliveryLocations={deliveryLocations}
+              defaultDeliveryLocationId={activeRow.deliveryLocationId}
+              deliveryLocationTitle={activeRow.deliveryLocationTitle}
+              onCommit={commitEditedReservation}
+              onCancelReservation={async () => {
+                setError(null);
+                try {
+                  await setReservationStatusAction(activeRow.id, "CANCELLED");
+                  setEditingRow(null);
+                } catch (err) {
+                  setError(err instanceof Error ? err.message : "حذف ناموفق بود");
+                  throw err;
+                }
+              }}
+            />
+          ) : null}
 
-              <AddonChoices
-                title="نوشیدنی"
-                noneLabel="بدون نوشیدنی"
-                items={editDrinks}
-                selectedId={editDrinkMenuItemId}
-                pending={pending}
-                onSelect={setEditDrinkMenuItemId}
-              />
-              <AddonChoices
-                title="ماست و سالاد"
-                noneLabel="بدون ماست و سالاد"
-                items={editSides}
-                selectedId={editSideMenuItemId}
-                pending={pending}
-                onSelect={setEditSideMenuItemId}
-              />
-            </section>
-
-            {error ? <p className="text-destructive text-sm">{error}</p> : null}
-          </div>
+          {error ? <p className="text-destructive text-sm">{error}</p> : null}
 
           <DialogFooter className="sm:justify-between">
             <Button
               type="button"
               variant="destructive"
-              disabled={pending}
+              disabled={pending || !activeRow}
               onClick={handleDelete}
             >
               {pending ? "…" : "حذف"}
@@ -715,19 +587,7 @@ export function ReservationsReportTable({
                 disabled={pending}
                 onClick={() => setEditingRow(null)}
               >
-                انصراف
-              </Button>
-              <Button
-                type="button"
-                disabled={
-                  pending ||
-                  !editMenuItemId ||
-                  !editLocationId ||
-                  editDayMenuPeriods.length === 0
-                }
-                onClick={handleSave}
-              >
-                {pending ? "…" : "ذخیره"}
+                بستن
               </Button>
             </div>
           </DialogFooter>

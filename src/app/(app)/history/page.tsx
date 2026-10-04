@@ -5,7 +5,6 @@ import { PermissionCode } from "@/lib/auth/constants";
 import {
   formatDateKey,
   formatDisplayDate,
-  getAllReservationHistory,
   getUserReservationHistory,
 } from "@/lib/meals";
 import { ReservationHistory } from "@/components/history/reservation-history";
@@ -15,13 +14,7 @@ export default async function HistoryPage() {
   if (!session) redirect("/login");
   if (!can(session, PermissionCode.RESERVATION_CREATE)) redirect("/menu");
 
-  const canManageAll = can(session, PermissionCode.REPORT_RESERVATIONS);
-  const canChangeStatus =
-    canManageAll || can(session, PermissionCode.RESERVATION_CANCEL);
-
-  const rows = canManageAll
-    ? await getAllReservationHistory()
-    : await getUserReservationHistory(session.userId);
+  const rows = await getUserReservationHistory(session.userId);
 
   const mealPeriods = Array.from(
     new Map(
@@ -47,13 +40,8 @@ export default async function HistoryPage() {
         deliveryLocationTitle: row.deliveryLocation.title,
         deliveryLocationAddress: row.deliveryLocation.address,
         status: row.status,
-        userName: row.user.name,
-        userLastName: row.user.lastName,
-        userPhone: row.user.phone,
       }))}
       mealPeriods={mealPeriods}
-      canChangeStatus={canChangeStatus}
-      canSearchUsers={canManageAll}
     />
   );
 }

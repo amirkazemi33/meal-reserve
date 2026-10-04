@@ -17,5 +17,8 @@ export default async function HomePage() {
   if (can(session, PermissionCode.REPORT_COOKING)) {
     redirect("/cooking-report");
   }
+  if (can(session, PermissionCode.FEEDBACK_MANAGE)) {
+    redirect("/admin/feedback");
+  }
   redirect("/login");
 }

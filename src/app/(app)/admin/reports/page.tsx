@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { getSession } from "@/lib/auth/session";
 import { can, redirectUnlessPermission } from "@/lib/rbac/can";
 import { PermissionCode } from "@/lib/auth/constants";
@@ -90,23 +89,11 @@ export default async function AdminReportsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            مدیریت رزروها
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            فهرست رزروهای فعال برای {rangeLabel}.
-          </p>
-        </div>
-        {can(session, PermissionCode.RESERVATION_FOR_OTHERS) ? (
-          <Link
-            href={`/admin/reserve-for?date=${encodeURIComponent(fromKey)}`}
-            className="border-border bg-background hover:bg-muted rounded-md border px-3 py-1.5 text-sm"
-          >
-            رزرو برای دیگران
-          </Link>
-        ) : null}
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">مدیریت رزروها</h1>
+        <p className="text-muted-foreground text-sm">
+          فهرست رزروهای فعال برای {rangeLabel}.
+        </p>
       </div>
 
       <ReservationsReportTable
@@ -118,6 +105,8 @@ export default async function AdminReportsPage({
         mealPeriods={mealPeriods.map((period) => ({
           id: period.id,
           title: period.title,
+          startTime: period.startTime,
+          endTime: period.endTime,
         }))}
         deliveryLocations={deliveryLocations.map((location) => ({
           id: location.id,

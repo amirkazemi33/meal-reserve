@@ -81,6 +81,7 @@ export default async function CookingReportPage({
                   key={key}
                   variant={active ? "default" : "outline"}
                   size="sm"
+                  nativeButton={false}
                   render={<Link href={cookingReportHref(key, mealPeriodId)} />}
                 >
                   {label}
@@ -92,6 +93,7 @@ export default async function CookingReportPage({
             <div className="space-y-1">
               <Label htmlFor="date">تاریخ</Label>
               <PersianDatePicker
+                key={dateKey}
                 id="date"
                 name="date"
                 defaultValue={dateKey}

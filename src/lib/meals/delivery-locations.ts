@@ -7,6 +7,15 @@ export async function getDeliveryLocations(activeOnly = true) {
   });
 }
 
+export async function getDeliveryLocationsForAdmin() {
+  return prisma.deliveryLocation.findMany({
+    orderBy: { title: "asc" },
+    include: {
+      _count: { select: { users: true, reservations: true } },
+    },
+  });
+}
+
 export async function getDeliveryLocationById(id: string) {
   return prisma.deliveryLocation.findUnique({ where: { id } });
 }
@@ -33,4 +42,32 @@ export async function upsertDeliveryLocation(input: {
   }
 
   return prisma.deliveryLocation.create({ data });
+}
+
+export async function deleteDeliveryLocation(
+  id: string,
+): Promise<{ error: string } | void> {
+  const location = await prisma.deliveryLocation.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      _count: { select: { users: true, reservations: true } },
+    },
+  });
+
+  if (!location) {
+    return { error: "محل تحویل پیدا نشد" };
+  }
+
+  if (location._count.users > 0) {
+    return {
+      error: `این محل به ${location._count.users} کاربر اختصاص دارد و قابل حذف نیست.`,
+    };
+  }
+
+  if (location._count.reservations > 0) {
+    return { error: "این محل در رزروها استفاده شده و قابل حذف نیست." };
+  }
+
+  await prisma.deliveryLocation.delete({ where: { id } });
 }

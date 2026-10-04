@@ -88,7 +88,12 @@ export default function PersianDatePicker({
   const inputSizeClass =
     size === "sm" ? "h-8 py-1 text-sm" : "h-12 py-3 text-sm";
 
-  /** Empty `{}` is what react-multi-date-picker treats as a cleared value. */
+  /**
+   * Empty `{}` clears a date. It must not be used for an empty time:
+   * `{}` is truthy, so the picker skips selecting a date on open, and the
+   * time plugin then updates the popup without calling `onChange`. The
+   * visible clock moves, but the form value stays empty.
+   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pickerValue: any =
     mode == "range"
@@ -98,7 +103,9 @@ export default function PersianDatePicker({
         ]
       : current
         ? convertISOToDateObject(current)
-        : {};
+        : onlyTimePicker
+          ? undefined
+          : {};
 
   function emit(next: string | string[]) {
     if (!isControlled) {

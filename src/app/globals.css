@@ -39,6 +39,21 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-booking-heading: var(--booking-heading);
+  --color-booking: var(--booking-text);
+  --color-booking-secondary: var(--booking-secondary);
+  --color-booking-muted: var(--booking-muted);
+  --color-booking-grey: var(--booking-grey);
+  --color-booking-brand: var(--booking-brand);
+  --color-booking-on-brand: var(--booking-on-brand);
+  --color-booking-wash: var(--booking-wash);
+  --color-booking-fill: var(--booking-fill);
+  --color-booking-fill-soft: var(--booking-fill-soft);
+  --color-booking-line: var(--booking-line);
+  --color-booking-reserved: var(--booking-reserved);
+  --color-booking-reserved-dot: var(--booking-reserved-dot);
+  --color-booking-cancel: var(--booking-cancel);
+  --color-booking-page: var(--booking-page);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -49,6 +64,22 @@
 }
 
 :root {
+  /* Food booking screen palette */
+  --booking-heading: oklch(0.18 0.01 260);
+  --booking-text: oklch(0.2 0.01 260);
+  --booking-secondary: oklch(0.5 0.008 260);
+  --booking-muted: oklch(0.68 0.006 260);
+  --booking-grey: oklch(0.62 0.006 260);
+  --booking-brand: #0d47a1;
+  --booking-on-brand: #fff;
+  --booking-wash: oklch(0.96 0.025 258);
+  --booking-fill: oklch(0.92 0.003 260);
+  --booking-fill-soft: oklch(0.97 0.002 260);
+  --booking-line: oklch(0.93 0.003 260);
+  --booking-reserved: oklch(0.45 0.11 150);
+  --booking-reserved-dot: oklch(0.62 0.13 150);
+  --booking-cancel: oklch(0.5 0.17 25);
+  --booking-page: #fff;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

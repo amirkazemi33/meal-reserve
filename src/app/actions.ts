@@ -17,6 +17,7 @@ import {
   resolveActiveUserIdsForProxyReserve,
   setCutoffTime,
   upsertDeliveryLocation,
+  deleteDeliveryLocation,
   upsertUserList,
   deleteUserList,
   addUserListMember,
@@ -274,7 +275,37 @@ export async function upsertMealPeriodAction(formData: FormData) {
     });
   }
   revalidatePath("/admin/meal-periods");
+  revalidatePath("/admin/menu");
   revalidatePath("/menu");
+}
+
+export async function deleteMealPeriodAction(
+  mealPeriodId: string,
+): Promise<{ error: string } | void> {
+  await requireAuthedPermission(PermissionCode.MEAL_PERIOD_MANAGE);
+  const id = mealPeriodId.trim();
+  if (!id) return { error: "وعده پیدا نشد" };
+
+  const period = await prisma.mealPeriod.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      _count: { select: { reservations: true } },
+    },
+  });
+
+  if (!period) return { error: "وعده پیدا نشد" };
+
+  if (period._count.reservations > 0) {
+    return { error: "این وعده در رزروها استفاده شده و قابل حذف نیست." };
+  }
+
+  await prisma.mealPeriod.delete({ where: { id } });
+  revalidatePath("/admin/meal-periods");
+  revalidatePath("/admin/menu");
+  revalidatePath("/menu");
+  revalidatePath("/admin/reports");
+  revalidatePath("/cooking-report");
 }
 
 export async function upsertFoodAction(formData: FormData) {
@@ -347,6 +378,18 @@ export async function upsertDeliveryLocationAction(formData: FormData) {
     description: description || null,
     isActive,
   });
+
+  revalidatePath("/admin/delivery-locations");
+  revalidatePath("/admin/users");
+  revalidatePath("/menu");
+}
+
+export async function deleteDeliveryLocationAction(
+  locationId: string,
+): Promise<{ error: string } | void> {
+  await requireAuthedPermission(PermissionCode.DELIVERY_LOCATION_MANAGE);
+  const result = await deleteDeliveryLocation(locationId);
+  if (result?.error) return result;
 
   revalidatePath("/admin/delivery-locations");
   revalidatePath("/admin/users");

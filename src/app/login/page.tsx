@@ -8,16 +8,14 @@ export default function LoginPage() {
         <Image
           src="/logo.png"
           alt="رزرو غذا"
-          width={72}
-          height={72}
-          className="mx-auto rounded-2xl"
+          width={285}
+          height={177}
+          className="mx-auto h-[72px] w-auto"
           priority
         />
-        <p className="mt-4 text-sm font-medium tracking-wide text-emerald-800/70">
-          رزرو غذا
-        </p>
+      
         <h1 className="mt-2 font-heading text-3xl font-semibold tracking-tight text-foreground">
-          رزرو وعده‌های روزانه
+          سیستم رزرو غذای مبتکران
         </h1>
       </div>
       <LoginForm />

@@ -26,6 +26,15 @@ export function parseCutoffTime(cutoff: string): { hours: number; minutes: numbe
   return { hours: hours || 0, minutes: minutes || 0 };
 }
 
+/** Cutoff instant for target date D: cutoff clock time on day D-1. */
+export function getReservationDeadline(targetDate: Date, cutoffTime: string): Date {
+  const deadlineDay = addDays(startOfDay(targetDate), -1);
+  const { hours, minutes } = parseCutoffTime(cutoffTime);
+  const deadline = new Date(deadlineDay);
+  deadline.setHours(hours, minutes, 0, 0);
+  return deadline;
+}
+
 /**
  * Reservations for target date D are editable until cutoff on day D-1.
  * For today and past dates: always locked.
@@ -43,12 +52,7 @@ export function isReservationEditable(
     return false;
   }
 
-  const deadlineDay = addDays(target, -1);
-  const { hours, minutes } = parseCutoffTime(cutoffTime);
-  const deadline = new Date(deadlineDay);
-  deadline.setHours(hours, minutes, 0, 0);
-
-  return now < deadline;
+  return now < getReservationDeadline(target, cutoffTime);
 }
 
 /**

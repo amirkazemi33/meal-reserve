@@ -4,6 +4,7 @@ import { can } from "@/lib/rbac/can";
 import { PermissionCode } from "@/lib/auth/constants";
 import { formatDisplayDate, getFeedbackCandidates } from "@/lib/meals";
 import { saveFeedbackAction } from "@/app/actions";
+import { PendingSubmitButton } from "@/components/admin/pending-submit-button";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +29,9 @@ export default async function FeedbackPage({
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">نظرات و امتیاز</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            نظرات و امتیاز
+          </h1>
           <p className="text-muted-foreground text-sm">
             به غذاهای بازه انتخابی امتیاز دهید (پیش‌فرض ۷ روز گذشته).
           </p>
@@ -70,7 +73,9 @@ export default async function FeedbackPage({
                 <p className="font-medium">
                   {formatDisplayDate(row.date)} · {row.mealPeriod.title}
                 </p>
-                <p className="text-muted-foreground text-sm">{row.food.title}</p>
+                <p className="text-muted-foreground text-sm">
+                  {row.food.title}
+                </p>
               </div>
               <div className="grid gap-3 sm:grid-cols-[120px_1fr_auto] sm:items-end">
                 <div className="space-y-1">
@@ -96,9 +101,10 @@ export default async function FeedbackPage({
                     placeholder="اختیاری"
                   />
                 </div>
-                <Button type="submit">
-                  {row.feedback ? "به‌روزرسانی" : "ثبت"}
-                </Button>
+                <PendingSubmitButton
+                  idleLabel={row.feedback ? "به‌روزرسانی" : "ثبت"}
+                  pendingLabel="در حال ذخیره…"
+                />
               </div>
             </form>
           ))

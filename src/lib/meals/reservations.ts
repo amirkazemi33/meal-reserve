@@ -70,26 +70,11 @@ const historyInclude = {
   mealPeriod: true,
   deliveryLocation: true,
   feedback: true,
-  user: {
-    select: {
-      id: true,
-      name: true,
-      lastName: true,
-      phone: true,
-    },
-  },
 } as const;
 
 export async function getUserReservationHistory(userId: string) {
   return prisma.reservation.findMany({
     where: { userId },
-    include: historyInclude,
-    orderBy: [{ date: "desc" }, { mealPeriod: { sortOrder: "asc" } }],
-  });
-}
-
-export async function getAllReservationHistory() {
-  return prisma.reservation.findMany({
     include: historyInclude,
     orderBy: [{ date: "desc" }, { mealPeriod: { sortOrder: "asc" } }],
   });

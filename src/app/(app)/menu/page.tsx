@@ -1,14 +1,13 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth/session";
 import { can } from "@/lib/rbac/can";
 import { PermissionCode } from "@/lib/auth/constants";
 import {
   formatDateKey,
-  formatDisplayDate,
   getAvailableMenuWeeks,
   getDeliveryLocations,
   getNextReservableDate,
+  getReservationDeadline,
   getUserReservationsForRange,
   getWeeklyMenu,
   parseDateKey,
@@ -16,23 +15,73 @@ import {
   startOfWeek,
 } from "@/lib/meals";
 import { prisma } from "@/lib/prisma";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { MealPeriodReserveBlock } from "@/components/menu/meal-period-reserve-block";
+import { ReserveBoard, type ReserveDay } from "@/components/menu/reserve-board";
 
-type SearchParams = Promise<{ week?: string; view?: string }>;
+type SearchParams = Promise<{ week?: string }>;
 
 function pickWeek(anchor: Date, availableWeeks: Date[]): Date {
   if (availableWeeks.length === 0) return startOfWeek(anchor);
 
   const target = startOfWeek(anchor).getTime();
-  const exact = availableWeeks.find((w) => w.getTime() === target);
+  const exact = availableWeeks.find((week) => week.getTime() === target);
   if (exact) return exact;
 
-  // Prefer nearest upcoming week with food; otherwise latest past week
-  const upcoming = availableWeeks.find((w) => w.getTime() >= target);
+  const upcoming = availableWeeks.find((week) => week.getTime() >= target);
   if (upcoming) return upcoming;
   return availableWeeks[availableWeeks.length - 1]!;
+}
+
+function persianDayParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("fa-IR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  const weekday = get("weekday");
+  const dayNumber = get("day");
+  const month = get("month");
+  return {
+    weekday,
+    dayNumber,
+    menuTitle: `منوی ${weekday} ${dayNumber} ${month}`,
+  };
+}
+
+function formatClock(value: string) {
+  const [hours, minutes] = value.split(":").map(Number);
+  return new Intl.DateTimeFormat("fa-IR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(2020, 0, 1, hours || 0, minutes || 0));
+}
+
+function deadlineLabels(date: Date) {
+  const parts = new Intl.DateTimeFormat("fa-IR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  const hour = date.getHours();
+  const period = hour < 12 ? "صبح" : hour < 18 ? "عصر" : "شب";
+  return {
+    dateLabel: `${get("weekday")} ${get("day")} ${get("month")}`,
+    timeLabel: `${get("hour")}:${get("minute")} ${period}`,
+  };
+}
+
+function initialDateKeyFor(days: ReserveDay[], focusKey: string) {
+  const focus = days.find((day) => day.dateKey === focusKey);
+  if (focus) return focus.dateKey;
+  const open = days.find((day) => day.status !== "closed");
+  return open?.dateKey ?? days[0]?.dateKey ?? "";
 }
 
 export default async function MenuPage({
@@ -46,6 +95,8 @@ export default async function MenuPage({
     if (can(session, PermissionCode.MENU_MANAGE)) redirect("/admin/menu");
     if (can(session, PermissionCode.REPORT_COOKING))
       redirect("/cooking-report");
+    if (can(session, PermissionCode.FEEDBACK_MANAGE))
+      redirect("/admin/feedback");
     redirect("/login");
   }
 
@@ -86,11 +137,14 @@ export default async function MenuPage({
   );
 
   const reservationBySlot = new Map(
-    reservations.map((r) => [`${formatDateKey(r.date)}:${r.mealPeriodId}`, r]),
+    reservations.map((reservation) => [
+      `${formatDateKey(reservation.date)}:${reservation.mealPeriodId}`,
+      reservation,
+    ]),
   );
 
   const currentIndex = availableWeeks.findIndex(
-    (w) => w.getTime() === weekStart.getTime(),
+    (week) => week.getTime() === weekStart.getTime(),
   );
   const prevWeekDate =
     currentIndex > 0 ? availableWeeks[currentIndex - 1] : null;
@@ -99,16 +153,9 @@ export default async function MenuPage({
       ? availableWeeks[currentIndex + 1]
       : null;
 
-  const singleDay = params.view === "day";
   const now = new Date();
   const todayKey = formatDateKey(startOfDay(now));
-  // First day the user can still reserve (tomorrow before cutoff, else day+2)
-  const focusDate = getNextReservableDate(now, cutoffTime);
-  const focusKey = formatDateKey(focusDate);
-  const focusWeekday = focusDate.getDay();
-  const visibleDays = singleDay
-    ? days.filter((d) => d.date.getDay() === focusWeekday)
-    : days;
+  const focusKey = formatDateKey(getNextReservableDate(now, cutoffTime));
 
   const locationOptions = deliveryLocations.map((location) => ({
     id: location.id,
@@ -116,160 +163,92 @@ export default async function MenuPage({
   }));
 
   const fallbackLocationId = deliveryLocations.some(
-    (l) => l.id === user.deliveryLocationId,
+    (location) => location.id === user.deliveryLocationId,
   )
     ? user.deliveryLocationId
     : (deliveryLocations[0]?.id ?? user.deliveryLocationId);
 
-  const navLinkClass =
-    "border-border bg-background hover:bg-muted rounded-md border px-3 py-1.5 text-sm";
-  const navDisabledClass =
-    "border-border text-muted-foreground cursor-not-allowed rounded-md border px-3 py-1.5 text-sm opacity-50";
+  const reservedDates = new Set(
+    reservations.map((reservation) => formatDateKey(reservation.date)),
+  );
+
+  const boardDays: ReserveDay[] = days.map(({ date, editable }) => {
+    const dateKey = formatDateKey(date);
+    const labels = persianDayParts(date);
+    const deadline = getReservationDeadline(date, cutoffTime);
+    const deadlineText = deadlineLabels(deadline);
+    const status = !editable
+      ? "closed"
+      : reservedDates.has(dateKey)
+        ? "reserved"
+        : "open";
+
+    return {
+      dateKey,
+      weekday: dateKey === todayKey ? "امروز" : labels.weekday,
+      dayNumber: labels.dayNumber,
+      menuTitle: labels.menuTitle,
+      isToday: dateKey === todayKey,
+      editable,
+      status,
+      deadlineIso: deadline.toISOString(),
+      deadlineDateLabel: deadlineText.dateLabel,
+      deadlineTimeLabel: deadlineText.timeLabel,
+      periods: mealPeriods.map((period) => {
+        const foods = menuItems.filter(
+          (item) =>
+            formatDateKey(item.date) === dateKey &&
+            item.mealPeriodId === period.id,
+        );
+        const current = reservationBySlot.get(`${dateKey}:${period.id}`);
+        return {
+          id: period.id,
+          title: period.title,
+          servingLabel: `سرو ${formatClock(period.startTime)} تا ${formatClock(period.endTime)}`,
+          quantityInputId: `quantity-${dateKey}-${period.id}`,
+          foods: foods.map((item) => ({
+            id: item.id,
+            foodId: item.foodId,
+            title: item.food.title,
+            description: item.food.description,
+            kind: item.food.kind,
+          })),
+          selectedFoodId: current?.foodId,
+          selectedDrinkMenuItemId: current?.drinkMenuItemId,
+          selectedSideMenuItemId: current?.sideMenuItemId,
+          reservationId: current?.id,
+          quantity: current?.quantity ?? 1,
+          defaultDeliveryLocationId:
+            current?.deliveryLocationId ?? fallbackLocationId,
+          deliveryLocationTitle: current?.deliveryLocation.title ?? null,
+        };
+      }),
+    };
+  });
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">منوی هفتگی</h1>
-          <p className="text-muted-foreground text-sm">
-            برای رزرو غذای هر روز تا ساعت {cutoffTime} روز قبل اقدام کنید.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {prevWeekDate ? (
-            <Link
-              href={`/menu?week=${formatDateKey(prevWeekDate)}${singleDay ? "&view=day" : ""}`}
-              className={navLinkClass}
-            >
-              هفته قبل
-            </Link>
-          ) : (
-            <span className={navDisabledClass}>هفته قبل</span>
-          )}
-          {nextWeekDate ? (
-            <Link
-              href={`/menu?week=${formatDateKey(nextWeekDate)}${singleDay ? "&view=day" : ""}`}
-              className={navLinkClass}
-            >
-              هفته بعد
-            </Link>
-          ) : (
-            <span className={navDisabledClass}>هفته بعد</span>
-          )}
-          <Link
-            href={
-              singleDay
-                ? `/menu?week=${formatDateKey(weekStart)}`
-                : `/menu?week=${formatDateKey(startOfWeek(focusDate))}&view=day`
-            }
-            className={navLinkClass}
-          >
-            {singleDay ? "نمای هفته" : "روزانه"}
-          </Link>
-        </div>
-      </div>
-
+    <div className="mx-auto w-full max-w-md">
       {availableWeeks.length === 0 ? (
-        <p className="text-muted-foreground text-sm">
+        <p className="text-booking-secondary text-sm">
           هنوز منویی برای نمایش ثبت نشده است.
         </p>
-      ) : null}
-
-      <div
-        className={
-          singleDay ? "grid gap-4" : "grid gap-4 md:grid-cols-2 lg:grid-cols-3"
-        }
-      >
-        {visibleDays.map(({ date, editable }) => {
-          const dateKey = formatDateKey(date);
-          const isToday = dateKey === todayKey;
-          const isFocusDay = dateKey === focusKey;
-          const isClosed = !editable;
-          const sectionClass = isFocusDay
-            ? "flex flex-col gap-3 overflow-hidden rounded-xl border border-emerald-700/30 bg-[linear-gradient(180deg,#ecfdf5_0%,#ffffff_70%)] p-4 shadow-[0_1px_0_rgba(6,95,70,0.1)] ring-1 ring-emerald-600/10"
-            : isClosed
-              ? "flex flex-col gap-3 overflow-hidden rounded-xl border border-amber-700/25 bg-[linear-gradient(180deg,#fffbeb_0%,#ffffff_70%)] p-4 shadow-[0_1px_0_rgba(146,64,14,0.08)] ring-1 ring-amber-600/10"
-              : "border-border/70 bg-background/90 flex flex-col gap-3 overflow-hidden rounded-xl border p-4 shadow-sm";
-          const titleClass = isFocusDay
-            ? "text-sm font-semibold text-emerald-950"
-            : isClosed
-              ? "text-sm font-semibold text-amber-950"
-              : "text-sm font-semibold";
-          return (
-            <section key={dateKey} className={sectionClass}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className={titleClass}>{formatDisplayDate(date)}</h2>
-                  {isToday ? (
-                    <span
-                      className={
-                        isFocusDay
-                          ? "rounded-md bg-emerald-800 px-1.5 py-0.5 text-[10px] font-medium text-emerald-50"
-                          : isClosed
-                            ? "rounded-md bg-amber-800 px-1.5 py-0.5 text-[10px] font-medium text-amber-50"
-                            : "bg-muted text-muted-foreground rounded-md px-1.5 py-0.5 text-[10px] font-medium"
-                      }
-                    >
-                      امروز
-                    </span>
-                  ) : null}
-                  {isFocusDay ? (
-                    <span className="rounded-md bg-emerald-800 px-1.5 py-0.5 text-[10px] font-medium text-emerald-50">
-                      قابل رزرو
-                    </span>
-                  ) : null}
-                </div>
-                <Badge variant={editable ? "secondary" : "outline"}>
-                  {editable ? "باز" : "بسته"}
-                </Badge>
-              </div>
-
-              <Separator />
-
-              <div className="divide-y divide-border/70">
-                {mealPeriods.map((period) => {
-                  const foods = menuItems.filter(
-                    (item) =>
-                      formatDateKey(item.date) === dateKey &&
-                      item.mealPeriodId === period.id,
-                  );
-                  const current = reservationBySlot.get(
-                    `${dateKey}:${period.id}`,
-                  );
-                  const slotDefaultLocationId =
-                    current?.deliveryLocationId ?? fallbackLocationId;
-
-                  return (
-                    <div key={period.id} className="py-3 first:pt-0 last:pb-0">
-                      <MealPeriodReserveBlock
-                        periodTitle={period.title}
-                        quantityInputId={`quantity-${dateKey}-${period.id}`}
-                        editable={editable}
-                        selectedFoodId={current?.foodId}
-                        selectedDrinkMenuItemId={current?.drinkMenuItemId}
-                        selectedSideMenuItemId={current?.sideMenuItemId}
-                        reservationId={current?.id}
-                        canSelectDeliveryLocation={canSelectDeliveryLocation}
-                        canSetQuantity={canSetQuantity}
-                        quantity={current?.quantity ?? 1}
-                        deliveryLocations={locationOptions}
-                        defaultDeliveryLocationId={slotDefaultLocationId}
-                        foods={foods.map((item) => ({
-                          id: item.id,
-                          foodId: item.foodId,
-                          title: item.food.title,
-                          description: item.food.description,
-                          kind: item.food.kind,
-                        }))}
-                      />
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          );
-        })}
-      </div>
+      ) : (
+        <ReserveBoard
+          key={formatDateKey(weekStart)}
+          days={boardDays}
+          initialDateKey={initialDateKeyFor(boardDays, focusKey)}
+          nowIso={now.toISOString()}
+          prevWeekHref={
+            prevWeekDate ? `/menu?week=${formatDateKey(prevWeekDate)}` : null
+          }
+          nextWeekHref={
+            nextWeekDate ? `/menu?week=${formatDateKey(nextWeekDate)}` : null
+          }
+          canSelectDeliveryLocation={canSelectDeliveryLocation}
+          canSetQuantity={canSetQuantity}
+          deliveryLocations={locationOptions}
+        />
+      )}
     </div>
   );
 }

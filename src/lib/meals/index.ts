@@ -1,6 +1,7 @@
 export {
   getCutoffTime,
   setCutoffTime,
+  getReservationDeadline,
   isReservationEditable,
   getNextReservableDate,
 } from "@/lib/meals/cutoff";
@@ -16,7 +17,6 @@ export {
 export {
   getUserReservationsForRange,
   getUserReservationHistory,
-  getAllReservationHistory,
   upsertReservation,
   upsertReservationsForOthers,
   resolveActiveUserIdsForProxyReserve,
@@ -28,10 +28,17 @@ export {
 export type { ReserveForOthersSelection } from "@/lib/meals/reservations";
 export {
   getDeliveryLocations,
+  getDeliveryLocationsForAdmin,
   getDeliveryLocationById,
   upsertDeliveryLocation,
+  deleteDeliveryLocation,
 } from "@/lib/meals/delivery-locations";
-export { getFeedbackCandidates, upsertFeedback } from "@/lib/meals/feedback";
+export {
+  getFeedbackCandidates,
+  getFeedbackReport,
+  upsertFeedback,
+} from "@/lib/meals/feedback";
+export type { FeedbackReportRow } from "@/lib/meals/feedback";
 export { getCookingReport, getReservationsReport } from "@/lib/meals/reports";
 export {
   listOwnedUserLists,

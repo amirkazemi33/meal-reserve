@@ -62,6 +62,12 @@ export const permissions = [
     menuKey: "feedback",
   },
   {
+    code: PermissionCode.FEEDBACK_MANAGE,
+    name: "مدیریت نظرات",
+    route: "/admin/feedback",
+    menuKey: "admin.feedback",
+  },
+  {
     code: PermissionCode.REPORT_COOKING,
     name: "آمار پخت",
     route: "/cooking-report",
