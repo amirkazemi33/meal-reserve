@@ -31,10 +31,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files — never commit secrets
-.env
-.env.*
-!.env.example
+# env files are committed for this project
+# keep machine-specific overrides private
+.env*.local
 
 # prisma
 /prisma/*.db

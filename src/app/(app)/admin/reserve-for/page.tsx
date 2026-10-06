@@ -11,6 +11,7 @@ import {
   parseDateKey,
 } from "@/lib/meals";
 import { ReserveForOthers } from "@/components/admin/reserve-for-others";
+import { parseFoodKind } from "@/lib/meals/food-kind";
 
 type SearchParams = Promise<{ date?: string }>;
 
@@ -64,7 +65,7 @@ export default async function ReserveForOthersPage({
           foodId: item.foodId,
           title: item.food.title,
           description: item.food.description,
-          kind: item.food.kind,
+          kind: parseFoodKind(item.food.kind),
         })),
     }))
     .filter((period) => period.foods.length > 0);

@@ -24,9 +24,30 @@ import {
   removeUserListMember,
   syncUserListMembers,
 } from "@/lib/meals";
-import { ReservationStatus } from "@/generated/prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
+import { ReservationStatus } from "@/lib/meals/reservation-status";
 import { parseDateKey } from "@/lib/meals/dates";
 import { parseFoodKind } from "@/lib/meals/food-kind";
+
+async function detachMenuItemsFromReservations(
+  tx: Prisma.TransactionClient,
+  menuItemIds: string[],
+) {
+  if (menuItemIds.length === 0) return;
+
+  await tx.reservation.updateMany({
+    where: { menuItemId: { in: menuItemIds } },
+    data: { menuItemId: null },
+  });
+  await tx.reservation.updateMany({
+    where: { drinkMenuItemId: { in: menuItemIds } },
+    data: { drinkMenuItemId: null },
+  });
+  await tx.reservation.updateMany({
+    where: { sideMenuItemId: { in: menuItemIds } },
+    data: { sideMenuItemId: null },
+  });
+}
 
 async function requireAuthedPermission(code: string) {
   const session = await getSession();
@@ -300,7 +321,17 @@ export async function deleteMealPeriodAction(
     return { error: "این وعده در رزروها استفاده شده و قابل حذف نیست." };
   }
 
-  await prisma.mealPeriod.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    const menuItems = await tx.menuItem.findMany({
+      where: { mealPeriodId: id },
+      select: { id: true },
+    });
+    await detachMenuItemsFromReservations(
+      tx,
+      menuItems.map((item) => item.id),
+    );
+    await tx.mealPeriod.delete({ where: { id } });
+  });
   revalidatePath("/admin/meal-periods");
   revalidatePath("/admin/menu");
   revalidatePath("/menu");
@@ -353,7 +384,25 @@ export async function deleteFoodAction(
     return { error: "این غذا در رزروها استفاده شده و قابل حذف نیست." };
   }
 
-  await prisma.food.delete({ where: { id } });
+  await prisma.$transaction(async (tx) => {
+    const menuItems = await tx.menuItem.findMany({
+      where: { foodId: id },
+      select: { id: true },
+    });
+    await detachMenuItemsFromReservations(
+      tx,
+      menuItems.map((item) => item.id),
+    );
+    await tx.reservation.updateMany({
+      where: { drinkFoodId: id },
+      data: { drinkFoodId: null, drinkMenuItemId: null },
+    });
+    await tx.reservation.updateMany({
+      where: { sideFoodId: id },
+      data: { sideFoodId: null, sideMenuItemId: null },
+    });
+    await tx.food.delete({ where: { id } });
+  });
   revalidatePath("/admin/foods");
   revalidatePath("/admin/menu");
   revalidatePath("/menu");
@@ -409,6 +458,14 @@ export async function setMenuFoodsAction(formData: FormData) {
   const date = parseDateKey(dateKey);
 
   await prisma.$transaction(async (tx) => {
+    const existing = await tx.menuItem.findMany({
+      where: { date, mealPeriodId },
+      select: { id: true },
+    });
+    await detachMenuItemsFromReservations(
+      tx,
+      existing.map((item) => item.id),
+    );
     await tx.menuItem.deleteMany({
       where: { date, mealPeriodId },
     });
@@ -505,7 +562,10 @@ export async function deleteUserAction(
   if (session.userId === userId) {
     return { error: "نمی‌توانید حساب خود را حذف کنید" };
   }
-  await prisma.user.delete({ where: { id: userId } });
+  await prisma.$transaction(async (tx) => {
+    await tx.userListMember.deleteMany({ where: { userId } });
+    await tx.user.delete({ where: { id: userId } });
+  });
   revalidatePath("/admin/users");
 }
 

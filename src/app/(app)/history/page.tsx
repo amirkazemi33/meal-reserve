@@ -8,6 +8,7 @@ import {
   getUserReservationHistory,
 } from "@/lib/meals";
 import { ReservationHistory } from "@/components/history/reservation-history";
+import { parseReservationStatus } from "@/lib/meals/reservation-status";
 
 export default async function HistoryPage() {
   const session = await getSession();
@@ -39,7 +40,7 @@ export default async function HistoryPage() {
         sideTitle: row.sideFood?.title ?? null,
         deliveryLocationTitle: row.deliveryLocation.title,
         deliveryLocationAddress: row.deliveryLocation.address,
-        status: row.status,
+        status: parseReservationStatus(row.status),
       }))}
       mealPeriods={mealPeriods}
     />

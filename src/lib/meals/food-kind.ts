@@ -6,6 +6,9 @@ export const FOOD_KINDS = {
 
 export type FoodKindValue = (typeof FOOD_KINDS)[keyof typeof FOOD_KINDS];
 
+export const FoodKind = FOOD_KINDS;
+export type FoodKind = FoodKindValue;
+
 export const FOOD_KIND_OPTIONS: { value: FoodKindValue; label: string }[] = [
   { value: FOOD_KINDS.MAIN, label: "غذا" },
   { value: FOOD_KINDS.DRINK, label: "نوشیدنی" },

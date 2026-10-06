@@ -19,4 +19,12 @@ if (existsSync(staticDir)) {
   cpSync(staticDir, join(standalone, ".next", "static"), { recursive: true });
 }
 
-console.log("Copied public and .next/static into standalone output.");
+const productionEnv = join(root, ".env.production");
+if (existsSync(productionEnv)) {
+  cpSync(productionEnv, join(standalone, ".env.production"));
+  cpSync(productionEnv, join(standalone, ".env"));
+}
+
+console.log(
+  "Copied public, .next/static, and .env.production into standalone output.",
+);

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { FoodKind, ReservationStatus } from "@/generated/prisma/client";
+import { FoodKind } from "@/lib/meals/food-kind";
+import { ReservationStatus } from "@/lib/meals/reservation-status";
 import { startOfDay } from "@/lib/meals/dates";
 import { getCutoffTime, isReservationEditable } from "@/lib/meals/cutoff";
 import { parseReservationQuantity } from "@/lib/meals/quantity";

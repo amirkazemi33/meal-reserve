@@ -16,6 +16,7 @@ import {
 } from "@/lib/meals";
 import { prisma } from "@/lib/prisma";
 import { ReserveBoard, type ReserveDay } from "@/components/menu/reserve-board";
+import { parseFoodKind } from "@/lib/meals/food-kind";
 
 type SearchParams = Promise<{ week?: string }>;
 
@@ -211,7 +212,7 @@ export default async function MenuPage({
             foodId: item.foodId,
             title: item.food.title,
             description: item.food.description,
-            kind: item.food.kind,
+            kind: parseFoodKind(item.food.kind),
           })),
           selectedFoodId: current?.foodId,
           selectedDrinkMenuItemId: current?.drinkMenuItemId,

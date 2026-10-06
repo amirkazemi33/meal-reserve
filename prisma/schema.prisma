@@ -6,18 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-}
-
-enum ReservationStatus {
-  ACTIVE
-  CANCELLED
-}
-
-enum FoodKind {
-  MAIN
-  DRINK
-  YOGURT_SALAD
+  provider = "sqlserver"
 }
 
 model User {
@@ -31,7 +20,7 @@ model User {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  deliveryLocation DeliveryLocation @relation(fields: [deliveryLocationId], references: [id])
+  deliveryLocation DeliveryLocation @relation(fields: [deliveryLocationId], references: [id], onUpdate: NoAction)
   roles            UserRole[]
   reservations     Reservation[]
   feedbacks        Feedback[]
@@ -70,8 +59,8 @@ model UserRole {
   userId String
   roleId String
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([userId, roleId])
   @@index([roleId])
@@ -81,8 +70,8 @@ model RolePermission {
   roleId       String
   permissionId String
 
-  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@id([roleId, permissionId])
   @@index([permissionId])
@@ -120,7 +109,7 @@ model Food {
   id          String   @id @default(cuid())
   title       String
   description String?
-  kind        FoodKind @default(MAIN)
+  kind        String   @default("MAIN")
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -141,8 +130,8 @@ model MenuItem {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  mealPeriod        MealPeriod    @relation(fields: [mealPeriodId], references: [id], onDelete: Cascade)
-  food              Food          @relation(fields: [foodId], references: [id], onDelete: Cascade)
+  mealPeriod        MealPeriod    @relation(fields: [mealPeriodId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  food              Food          @relation(fields: [foodId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   reservations      Reservation[] @relation("ReservationMainMenuItem")
   drinkReservations Reservation[] @relation("ReservationDrinkMenuItem")
   sideReservations  Reservation[] @relation("ReservationSideMenuItem")
@@ -166,19 +155,19 @@ model Reservation {
   sideMenuItemId     String?
   deliveryLocationId String
   quantity           Int               @default(1)
-  status             ReservationStatus @default(ACTIVE)
+  status             String            @default("ACTIVE")
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
 
-  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mealPeriod       MealPeriod       @relation(fields: [mealPeriodId], references: [id])
-  food             Food             @relation("ReservationMainFood", fields: [foodId], references: [id])
-  menuItem         MenuItem?        @relation("ReservationMainMenuItem", fields: [menuItemId], references: [id], onDelete: SetNull)
-  drinkFood        Food?            @relation("ReservationDrink", fields: [drinkFoodId], references: [id], onDelete: SetNull)
-  drinkMenuItem    MenuItem?        @relation("ReservationDrinkMenuItem", fields: [drinkMenuItemId], references: [id], onDelete: SetNull)
-  sideFood         Food?            @relation("ReservationSide", fields: [sideFoodId], references: [id], onDelete: SetNull)
-  sideMenuItem     MenuItem?        @relation("ReservationSideMenuItem", fields: [sideMenuItemId], references: [id], onDelete: SetNull)
-  deliveryLocation DeliveryLocation @relation(fields: [deliveryLocationId], references: [id])
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  mealPeriod       MealPeriod       @relation(fields: [mealPeriodId], references: [id], onUpdate: NoAction)
+  food             Food             @relation("ReservationMainFood", fields: [foodId], references: [id], onUpdate: NoAction)
+  menuItem         MenuItem?        @relation("ReservationMainMenuItem", fields: [menuItemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  drinkFood        Food?            @relation("ReservationDrink", fields: [drinkFoodId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  drinkMenuItem    MenuItem?        @relation("ReservationDrinkMenuItem", fields: [drinkMenuItemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sideFood         Food?            @relation("ReservationSide", fields: [sideFoodId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  sideMenuItem     MenuItem?        @relation("ReservationSideMenuItem", fields: [sideMenuItemId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  deliveryLocation DeliveryLocation @relation(fields: [deliveryLocationId], references: [id], onUpdate: NoAction)
   feedback         Feedback?
 
   @@unique([userId, date, mealPeriodId])
@@ -201,8 +190,8 @@ model Feedback {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reservation Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user        User        @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([userId])
 }
@@ -223,7 +212,7 @@ model UserList {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  owner   User             @relation("UserListOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  owner   User             @relation("UserListOwner", fields: [ownerId], references: [id], onDelete: Cascade, onUpdate: NoAction)
   members UserListMember[]
 
   @@index([ownerId])
@@ -234,8 +223,8 @@ model UserListMember {
   userId    String
   createdAt DateTime @default(now())
 
-  list UserList @relation(fields: [listId], references: [id], onDelete: Cascade)
-  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  list UserList @relation(fields: [listId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  user User     @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@id([listId, userId])
   @@index([userId])

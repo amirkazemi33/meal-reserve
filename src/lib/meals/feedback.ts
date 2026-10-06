@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { ReservationStatus } from "@/generated/prisma/client";
+import { ReservationStatus } from "@/lib/meals/reservation-status";
 import {
   addDays,
   formatDateKey,
